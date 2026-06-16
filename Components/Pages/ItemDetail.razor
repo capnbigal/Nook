@@ -1,0 +1,314 @@
+@page "/items/{Id:int}"
+@inject IItemService ItemService
+@inject ITagService TagService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_item?.Title ?? "Item") · Nook</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_item is null)
+{
+    <MudAlert Severity="Severity.Error">Item not found.</MudAlert>
+    <MudButton Class="mt-3" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/items">Back to items</MudButton>
+}
+else
+{
+    <div class="d-flex align-center mb-4 gap-2 flex-wrap">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/items" title="Back" />
+        <MudText Typo="Typo.h4" Class="flex-grow-1">@_item.Title</MudText>
+
+        @if (!_editing)
+        {
+            <MudIconButton Icon="@(_item.IsPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                           Color="@(_item.IsPinned ? Color.Primary : Color.Default)" OnClick="TogglePin" title="Pin" />
+            <MudIconButton Icon="@(_item.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                           Color="@(_item.IsFavorite ? Color.Warning : Color.Default)" OnClick="ToggleFavorite" title="Favorite" />
+            <MudButton StartIcon="@Icons.Material.Filled.Edit" Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="StartEdit">Edit</MudButton>
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert">
+                @if (!_item.IsArchived)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.Archive" OnClick="Archive">Archive</MudMenuItem>
+                }
+                else
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.Unarchive" OnClick="Unarchive">Unarchive</MudMenuItem>
+                }
+                <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="Delete">Delete</MudMenuItem>
+            </MudMenu>
+        }
+    </div>
+
+    @if (_editing)
+    {
+        <MudPaper Class="pa-6 mb-4" Elevation="1">
+            <ItemEditor Item="_editModel" AllTags="_allTags" SelectedTagIds="_selectedTagIds"
+                        SubmitLabel="Save changes" OnValidSubmit="SaveEdit" OnCancel="CancelEdit" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    @if (!string.IsNullOrWhiteSpace(_item.Body))
+                    {
+                        <MudText Typo="Typo.body1" Style="white-space:pre-wrap;">@_item.Body</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No content.</MudText>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_item.Url))
+                    {
+                        <MudLink Href="@_item.Url" Target="_blank" Class="d-flex align-center gap-1 mt-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" /> @_item.Url
+                        </MudLink>
+                    }
+                    @if (_item.Tags.Any())
+                    {
+                        <TagChips Tags="_item.Tags" Class="mt-3" />
+                    }
+                </MudPaper>
+
+                @* Manual links between items *@
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Linked items</MudText>
+                    @if (!_item.OutgoingLinks.Any() && !_item.IncomingLinks.Any())
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No linked items.</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true">
+                            @foreach (var link in _item.OutgoingLinks)
+                            {
+                                <MudListItem T="string">
+                                    <div class="d-flex align-center justify-space-between">
+                                        <MudLink Href="@($"/items/{link.TargetItemId}")">→ @link.TargetItem?.Title</MudLink>
+                                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.LinkOff"
+                                                       OnClick="@(() => Unlink(link.ItemLinkId))" title="Remove link" />
+                                    </div>
+                                </MudListItem>
+                            }
+                            @foreach (var link in _item.IncomingLinks)
+                            {
+                                <MudListItem T="string">
+                                    <div class="d-flex align-center justify-space-between">
+                                        <MudLink Href="@($"/items/{link.SourceItemId}")">← @link.SourceItem?.Title</MudLink>
+                                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.LinkOff"
+                                                       OnClick="@(() => Unlink(link.ItemLinkId))" title="Remove link" />
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                    <MudAutocomplete T="Item" Label="Link to another item…" SearchFunc="SearchItems"
+                                     ToStringFunc="@(i => i is null ? string.Empty : i.Title)"
+                                     ValueChanged="AddLink" ResetValueOnEmptyText="true" Clearable="true"
+                                     Dense="true" Class="mt-2" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Details</MudText>
+                    <MudField Label="Type" Variant="Variant.Text">@_item.ItemType</MudField>
+                    <MudField Label="Status" Variant="Variant.Text">@_item.Status</MudField>
+                    <MudField Label="Priority" Variant="Variant.Text">@(_item.Priority?.ToString() ?? "—")</MudField>
+                    <MudField Label="Due" Variant="Variant.Text">@Format(_item.DueDate)</MudField>
+                    <MudField Label="Reminder" Variant="Variant.Text">@Format(_item.ReminderDate)</MudField>
+                    <MudField Label="Completed" Variant="Variant.Text">@Format(_item.CompletedDate)</MudField>
+                    <MudField Label="Created" Variant="Variant.Text">@Format(_item.CreatedAt)</MudField>
+                    <MudField Label="Updated" Variant="Variant.Text">@Format(_item.UpdatedAt)</MudField>
+                    @if (_item.Parent is not null)
+                    {
+                        <MudField Label="Parent" Variant="Variant.Text">
+                            <MudLink Href="@($"/items/{_item.ParentItemId}")">@_item.Parent.Title</MudLink>
+                        </MudField>
+                    }
+                </MudPaper>
+
+                @* Child items (sub-tasks / list items / grouped thoughts) *@
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <div class="d-flex align-center mb-2">
+                        <MudText Typo="Typo.h6">Sub-items</MudText>
+                        <MudSpacer />
+                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Add"
+                                       Href="@($"/items/new?parentId={_item.ItemId}")" title="Add sub-item" />
+                    </div>
+                    @if (_children.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No sub-items.</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true">
+                            @foreach (var child in _children)
+                            {
+                                <MudListItem T="string" Href="@($"/items/{child.ItemId}")"
+                                             Icon="@(child.Status == ItemStatus.Done ? Icons.Material.Filled.CheckCircle : Icons.Material.Outlined.RadioButtonUnchecked)">
+                                    @child.Title
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+
+                @* Items sharing tags *@
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Related by tags</MudText>
+                    @if (_related.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No related items.</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true">
+                            @foreach (var rel in _related)
+                            {
+                                <MudListItem T="string" Href="@($"/items/{rel.ItemId}")">@rel.Title</MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Item? _item;
+    private Item _editModel = new();
+    private List<Item> _related = new();
+    private List<Item> _children = new();
+    private List<Tag> _allTags = new();
+    private List<int> _selectedTagIds = new();
+    private bool _editing;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload whenever the route id changes (e.g. navigating between linked items).
+        _editing = false;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _item = await ItemService.GetByIdAsync(Id);
+        if (_item is not null)
+        {
+            _related = await ItemService.GetRelatedByTagsAsync(Id);
+            _children = await ItemService.GetChildrenAsync(Id);
+        }
+        _loading = false;
+    }
+
+    private async Task StartEdit()
+    {
+        _allTags = await TagService.GetAllAsync();
+        _editModel = Clone(_item!);
+        _selectedTagIds = _item!.Tags.Select(t => t.TagId).ToList();
+        _editing = true;
+    }
+
+    private void CancelEdit() => _editing = false;
+
+    private async Task SaveEdit()
+    {
+        await ItemService.UpdateAsync(_editModel, _selectedTagIds);
+        Snackbar.Add("Saved", Severity.Success);
+        _editing = false;
+        await LoadAsync();
+    }
+
+    private async Task TogglePin()
+    {
+        await ItemService.TogglePinAsync(Id);
+        await LoadAsync();
+    }
+
+    private async Task ToggleFavorite()
+    {
+        await ItemService.ToggleFavoriteAsync(Id);
+        await LoadAsync();
+    }
+
+    private async Task Archive()
+    {
+        await ItemService.ArchiveAsync(Id);
+        Snackbar.Add("Archived", Severity.Info);
+        await LoadAsync();
+    }
+
+    private async Task Unarchive()
+    {
+        await ItemService.UnarchiveAsync(Id);
+        await LoadAsync();
+    }
+
+    private async Task Delete()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete item?",
+            "This permanently removes the item. Consider archiving instead.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            await ItemService.DeleteAsync(Id);
+            Snackbar.Add("Item deleted", Severity.Info);
+            Nav.NavigateTo("/items");
+        }
+    }
+
+    private async Task<IEnumerable<Item>> SearchItems(string value, CancellationToken token)
+    {
+        var results = await ItemService.GetItemsAsync(new ItemFilter { SearchText = value });
+        return results.Where(i => i.ItemId != Id).Take(10);
+    }
+
+    private async Task AddLink(Item? target)
+    {
+        if (target is null) return;
+        await ItemService.LinkAsync(Id, target.ItemId);
+        await LoadAsync();
+    }
+
+    private async Task Unlink(int itemLinkId)
+    {
+        await ItemService.UnlinkAsync(itemLinkId);
+        await LoadAsync();
+    }
+
+    private static string Format(DateTime? value) =>
+        value is null ? "—" : value.Value.ToLocalTime().ToString("g");
+
+    private static Item Clone(Item s) => new()
+    {
+        ItemId = s.ItemId,
+        Title = s.Title,
+        Body = s.Body,
+        ItemType = s.ItemType,
+        Status = s.Status,
+        Priority = s.Priority,
+        DueDate = s.DueDate,
+        ReminderDate = s.ReminderDate,
+        CompletedDate = s.CompletedDate,
+        Url = s.Url,
+        ParentItemId = s.ParentItemId,
+        CreatedAt = s.CreatedAt,
+        UpdatedAt = s.UpdatedAt,
+        ArchivedAt = s.ArchivedAt,
+        IsPinned = s.IsPinned,
+        IsFavorite = s.IsFavorite
+    };
+}

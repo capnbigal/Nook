@@ -1,0 +1,69 @@
+@page "/bookmarks"
+@inject IItemService ItemService
+@inject ITagService TagService
+
+<PageTitle>Bookmarks · Nook</PageTitle>
+
+<div class="d-flex align-center mb-4 flex-wrap gap-2">
+    <MudText Typo="Typo.h4">Bookmarks</MudText>
+    <MudSpacer />
+    <MudSelect T="int?" Value="_tagId" ValueChanged="OnTagChanged" Label="Filter by tag"
+               Clearable="true" Dense="true" Style="max-width:220px;">
+        @foreach (var tag in _allTags)
+        {
+            <MudSelectItem T="int?" Value="@((int?)tag.TagId)">@tag.Name</MudSelectItem>
+        }
+    </MudSelect>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               Href="/items/new?type=Bookmark">New bookmark</MudButton>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_bookmarks.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No bookmarks yet.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @foreach (var item in _bookmarks)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <ItemCard Item="item" OnChanged="ReloadAsync" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<Item> _bookmarks = new();
+    private List<Tag> _allTags = new();
+    private int? _tagId;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allTags = await TagService.GetAllAsync();
+        await ReloadAsync();
+    }
+
+    private Task OnTagChanged(int? tagId)
+    {
+        _tagId = tagId;
+        return ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        _bookmarks = await ItemService.GetItemsAsync(new ItemFilter
+        {
+            ItemType = ItemType.Bookmark,
+            TagId = _tagId
+        });
+        _loading = false;
+    }
+}

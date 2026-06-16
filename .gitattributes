@@ -1,0 +1,13 @@
+# Normalize line endings on commit; check out native on each platform.
+* text=auto
+
+# Force CRLF for Windows-specific solution files.
+*.sln text eol=crlf
+
+# Treat these as text.
+*.cs       text
+*.csproj   text
+*.razor    text
+*.json     text
+*.css      text
+*.md       text

@@ -1,0 +1,147 @@
+@* A single item rendered as a card with quick actions. *@
+@inject IItemService ItemService
+@inject ISnackbar Snackbar
+
+<MudCard Elevation="2" Class="d-flex flex-column" Style="height:100%;">
+    <MudCardHeader>
+        <CardHeaderAvatar>
+            <MudIcon Icon="@TypeIcon(Item.ItemType)" Color="Color.Primary" />
+        </CardHeaderAvatar>
+        <CardHeaderContent>
+            <MudLink Href="@($"/items/{Item.ItemId}")" Typo="Typo.subtitle1">@Item.Title</MudLink>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@Item.ItemType &bull; @Item.Status</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudIconButton Size="Size.Small" OnClick="TogglePin" title="Pin"
+                           Icon="@(Item.IsPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                           Color="@(Item.IsPinned ? Color.Primary : Color.Default)" />
+            <MudIconButton Size="Size.Small" OnClick="ToggleFavorite" title="Favorite"
+                           Icon="@(Item.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                           Color="@(Item.IsFavorite ? Color.Warning : Color.Default)" />
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent Class="flex-grow-1">
+        @if (!string.IsNullOrWhiteSpace(Item.Body))
+        {
+            <MudText Typo="Typo.body2" Style="white-space:pre-wrap;">@Truncate(Item.Body, 180)</MudText>
+        }
+        @if (!string.IsNullOrWhiteSpace(Item.Url))
+        {
+            <MudLink Href="@Item.Url" Target="_blank" Typo="Typo.body2" Class="d-block mt-1">@Item.Url</MudLink>
+        }
+        <div class="d-flex flex-wrap gap-2 align-center mt-2">
+            @if (Item.Priority is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="@PriorityColor(Item.Priority.Value)">@Item.Priority</MudChip>
+            }
+            @if (Item.DueDate is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Event"
+                         Color="@(IsOverdue ? Color.Error : Color.Default)">Due @Item.DueDate.Value.ToLocalTime().ToString("d")</MudChip>
+            }
+            @if (Item.ReminderDate is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Alarm">@Item.ReminderDate.Value.ToLocalTime().ToString("g")</MudChip>
+            }
+        </div>
+        <TagChips Tags="Item.Tags" Class="mt-2" />
+    </MudCardContent>
+    <MudCardActions>
+        @if (Item.ItemType is ItemType.Todo or ItemType.Reminder)
+        {
+            @if (Item.Status != ItemStatus.Done)
+            {
+                <MudButton Size="Size.Small" OnClick="Complete" StartIcon="@Icons.Material.Filled.Check">Complete</MudButton>
+            }
+            else
+            {
+                <MudButton Size="Size.Small" OnClick="Reopen" StartIcon="@Icons.Material.Filled.Undo">Reopen</MudButton>
+            }
+        }
+        <MudSpacer />
+        @if (!Item.IsArchived)
+        {
+            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Archive" OnClick="Archive" title="Archive" />
+        }
+        else
+        {
+            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Unarchive" OnClick="Unarchive" title="Unarchive" />
+        }
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.OpenInNew" Href="@($"/items/{Item.ItemId}")" title="Open" />
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public Item Item { get; set; } = default!;
+
+    /// <summary>Raised after a quick action so the parent page can refresh its list.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool IsOverdue =>
+        Item.DueDate is not null && Item.DueDate < DateTime.UtcNow && Item.Status != ItemStatus.Done;
+
+    private async Task TogglePin()
+    {
+        await ItemService.TogglePinAsync(Item.ItemId);
+        await Notify();
+    }
+
+    private async Task ToggleFavorite()
+    {
+        await ItemService.ToggleFavoriteAsync(Item.ItemId);
+        await Notify();
+    }
+
+    private async Task Complete()
+    {
+        await ItemService.CompleteAsync(Item.ItemId);
+        Snackbar.Add("Marked complete", Severity.Success);
+        await Notify();
+    }
+
+    private async Task Reopen()
+    {
+        await ItemService.ReopenAsync(Item.ItemId);
+        await Notify();
+    }
+
+    private async Task Archive()
+    {
+        await ItemService.ArchiveAsync(Item.ItemId);
+        Snackbar.Add("Archived", Severity.Info);
+        await Notify();
+    }
+
+    private async Task Unarchive()
+    {
+        await ItemService.UnarchiveAsync(Item.ItemId);
+        await Notify();
+    }
+
+    private Task Notify() => OnChanged.InvokeAsync();
+
+    private static string Truncate(string text, int max) =>
+        text.Length <= max ? text : text[..max] + "…";
+
+    private static string TypeIcon(ItemType type) => type switch
+    {
+        ItemType.Note => Icons.Material.Filled.Note,
+        ItemType.Reminder => Icons.Material.Filled.Alarm,
+        ItemType.Bookmark => Icons.Material.Filled.Bookmark,
+        ItemType.Thought => Icons.Material.Filled.Lightbulb,
+        ItemType.List => Icons.Material.Filled.List,
+        ItemType.Todo => Icons.Material.Filled.CheckBox,
+        ItemType.Idea => Icons.Material.Filled.EmojiObjects,
+        ItemType.Reference => Icons.Material.Filled.MenuBook,
+        _ => Icons.Material.Filled.Article
+    };
+
+    private static Color PriorityColor(Priority priority) => priority switch
+    {
+        Priority.Low => Color.Info,
+        Priority.Medium => Color.Primary,
+        Priority.High => Color.Warning,
+        Priority.Urgent => Color.Error,
+        _ => Color.Default
+    };
+}

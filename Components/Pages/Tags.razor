@@ -1,0 +1,100 @@
+@page "/tags"
+@inject ITagService TagService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Tags · Nook</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Tags</MudText>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-2">Create a tag</MudText>
+    <div class="d-flex align-center gap-2 flex-wrap">
+        <MudTextField T="string" @bind-Value="_newName" Label="Name" Margin="Margin.Dense"
+                      Immediate="true" Style="max-width:240px;" />
+        <MudTextField T="string" @bind-Value="_newColor" Label="Color (hex or name, optional)"
+                      Margin="Margin.Dense" Style="max-width:240px;" Placeholder="#1E88E5" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateAsync" Disabled="@string.IsNullOrWhiteSpace(_newName)">Create</MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Class="pa-4" Elevation="1">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_tags.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No tags yet. Create one above.</MudText>
+    }
+    else
+    {
+        <MudList T="string">
+            @foreach (var tag in _tags)
+            {
+                <MudListItem T="string">
+                    <div class="d-flex align-center gap-3 flex-wrap">
+                        <MudChip T="string" Variant="Variant.Outlined"
+                                 Style="@(string.IsNullOrWhiteSpace(tag.Color) ? "" : $"border-color:{tag.Color};color:{tag.Color};")">
+                            @tag.Name
+                        </MudChip>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary flex-grow-1">@tag.ItemCount item(s)</MudText>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterList"
+                                   OnClick="@(() => Nav.NavigateTo($"/items?tagId={tag.TagId}"))">View items</MudButton>
+                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Delete"
+                                       OnClick="@(() => DeleteAsync(tag))" title="Delete tag" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+    }
+</MudPaper>
+
+@code {
+    private List<TagSummary> _tags = new();
+    private string? _newName;
+    private string? _newColor;
+    private bool _loading = true;
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        _tags = await TagService.GetTagSummaryAsync();
+        _loading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        try
+        {
+            await TagService.CreateAsync(_newName, string.IsNullOrWhiteSpace(_newColor) ? null : _newColor);
+            Snackbar.Add("Tag created", Severity.Success);
+            _newName = string.Empty;
+            _newColor = string.Empty;
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DeleteAsync(TagSummary tag)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete tag?",
+            $"\"{tag.Name}\" will be removed from {tag.ItemCount} item(s). The items themselves are not deleted.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            await TagService.DeleteAsync(tag.TagId);
+            Snackbar.Add("Tag deleted", Severity.Info);
+            await ReloadAsync();
+        }
+    }
+}

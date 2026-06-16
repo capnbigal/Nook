@@ -1,0 +1,105 @@
+@* Pick existing tags via autocomplete, or create a new one inline. *@
+@inject ITagService TagService
+@inject ISnackbar Snackbar
+
+<div>
+    <MudAutocomplete T="Tag" Label="Add an existing tag" SearchFunc="Search"
+                     ToStringFunc="@(t => t is null ? string.Empty : t.Name)"
+                     ValueChanged="OnSelected" ResetValueOnEmptyText="true"
+                     CoerceText="true" Clearable="true" Dense="true"
+                     AdornmentIcon="@Icons.Material.Filled.Label" />
+
+    <div class="d-flex align-center gap-2 mt-1">
+        <MudTextField T="string" @bind-Value="_newTagName" Placeholder="…or create a new tag"
+                      Margin="Margin.Dense" Variant="Variant.Text" Immediate="true"
+                      OnKeyUp="OnNewTagKeyUp" />
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="CreateAndAdd"
+                   Disabled="@string.IsNullOrWhiteSpace(_newTagName)">Create</MudButton>
+    </div>
+
+    @if (_selectedTags.Count > 0)
+    {
+        <div class="d-flex flex-wrap gap-1 mt-2">
+            @foreach (var tag in _selectedTags)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary"
+                         OnClose="@(() => Remove(tag))" Style="@ChipStyle(tag)">@tag.Name</MudChip>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<Tag> AllTags { get; set; } = new();
+    [Parameter] public List<int> SelectedTagIds { get; set; } = new();
+    [Parameter] public EventCallback<List<int>> SelectedTagIdsChanged { get; set; }
+
+    private List<Tag> _selectedTags = new();
+    private string? _newTagName;
+
+    protected override void OnParametersSet() => RefreshSelected();
+
+    private void RefreshSelected() =>
+        _selectedTags = AllTags.Where(t => SelectedTagIds.Contains(t.TagId)).ToList();
+
+    private Task<IEnumerable<Tag>> Search(string value, CancellationToken token)
+    {
+        IEnumerable<Tag> available = AllTags.Where(t => !SelectedTagIds.Contains(t.TagId));
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            available = available.Where(t => t.Name.Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+        return Task.FromResult(available);
+    }
+
+    private async Task OnSelected(Tag? tag)
+    {
+        if (tag is null || SelectedTagIds.Contains(tag.TagId)) return;
+        SelectedTagIds.Add(tag.TagId);
+        RefreshSelected();
+        await SelectedTagIdsChanged.InvokeAsync(SelectedTagIds);
+    }
+
+    private async Task Remove(Tag tag)
+    {
+        SelectedTagIds.Remove(tag.TagId);
+        RefreshSelected();
+        await SelectedTagIdsChanged.InvokeAsync(SelectedTagIds);
+    }
+
+    private async Task OnNewTagKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CreateAndAdd();
+        }
+    }
+
+    private async Task CreateAndAdd()
+    {
+        var name = _newTagName?.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+        try
+        {
+            var tag = await TagService.GetOrCreateAsync(name);
+            if (AllTags.All(t => t.TagId != tag.TagId))
+            {
+                AllTags.Add(tag);
+            }
+            if (!SelectedTagIds.Contains(tag.TagId))
+            {
+                SelectedTagIds.Add(tag.TagId);
+                await SelectedTagIdsChanged.InvokeAsync(SelectedTagIds);
+            }
+            RefreshSelected();
+            _newTagName = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static string ChipStyle(Tag tag) =>
+        string.IsNullOrWhiteSpace(tag.Color) ? string.Empty : $"background-color:{tag.Color};color:#fff;";
+}

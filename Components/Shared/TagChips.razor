@@ -1,0 +1,19 @@
+@* Read-only display of an item's tags as MudBlazor chips. *@
+@if (Tags is not null && Tags.Any())
+{
+    <div class="d-flex flex-wrap gap-1 @Class">
+        @foreach (var tag in Tags)
+        {
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                     Style="@ChipStyle(tag)">@tag.Name</MudChip>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IEnumerable<Tag>? Tags { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private static string ChipStyle(Tag tag) =>
+        string.IsNullOrWhiteSpace(tag.Color) ? string.Empty : $"border-color:{tag.Color};color:{tag.Color};";
+}

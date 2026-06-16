@@ -1,0 +1,84 @@
+@page "/"
+@page "/dashboard"
+@inject IItemService ItemService
+@inject ITagService TagService
+@inject NavigationManager Nav
+
+<PageTitle>Dashboard · Nook</PageTitle>
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Dashboard</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               Href="/items/new">New item</MudButton>
+</div>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid>
+        <DashboardSection Title="Overdue" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
+                          Items="_overdue" EmptyText="Nothing overdue 🎉" ShowDate="true" />
+        <DashboardSection Title="Due soon" Icon="@Icons.Material.Filled.Schedule" IconColor="Color.Warning"
+                          Items="_dueSoon" EmptyText="Nothing due in the next week." ShowDate="true" />
+        <DashboardSection Title="Pinned" Icon="@Icons.Material.Filled.PushPin" IconColor="Color.Primary"
+                          Items="_pinned" EmptyText="No pinned items." />
+        <DashboardSection Title="Favorites" Icon="@Icons.Material.Filled.Star" IconColor="Color.Warning"
+                          Items="_favorites" EmptyText="No favorites yet." />
+        <DashboardSection Title="Recently created" Icon="@Icons.Material.Filled.FiberNew" IconColor="Color.Info"
+                          Items="_recentCreated" EmptyText="No items yet." />
+        <DashboardSection Title="Recently updated" Icon="@Icons.Material.Filled.Update" IconColor="Color.Info"
+                          Items="_recentUpdated" EmptyText="No items yet." />
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="1">
+                <div class="d-flex align-center mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Label" Class="mr-2" />
+                    <MudText Typo="Typo.h6">Tags</MudText>
+                </div>
+                @if (_tags.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No tags yet.</MudText>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var tag in _tags)
+                        {
+                            <MudChip T="string" Color="Color.Default"
+                                     OnClick="@(() => Nav.NavigateTo($"/items?tagId={tag.TagId}"))">
+                                @tag.Name <MudText Typo="Typo.caption" Class="ml-1">(@tag.ItemCount)</MudText>
+                            </MudChip>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Item> _overdue = new();
+    private List<Item> _dueSoon = new();
+    private List<Item> _pinned = new();
+    private List<Item> _favorites = new();
+    private List<Item> _recentCreated = new();
+    private List<Item> _recentUpdated = new();
+    private List<TagSummary> _tags = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _overdue = await ItemService.GetOverdueAsync();
+        _dueSoon = await ItemService.GetDueSoonAsync();
+        _pinned = await ItemService.GetPinnedAsync();
+        _favorites = await ItemService.GetFavoritesAsync();
+        _recentCreated = await ItemService.GetRecentlyCreatedAsync();
+        _recentUpdated = await ItemService.GetRecentlyUpdatedAsync();
+        _tags = await TagService.GetTagSummaryAsync();
+        _loading = false;
+    }
+}

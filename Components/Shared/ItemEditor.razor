@@ -1,0 +1,91 @@
+@* Create/edit form for an item. The host page owns persistence. *@
+<EditForm Model="Item" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+    <MudGrid Spacing="3">
+        <MudItem xs="12">
+            <MudTextField @bind-Value="Item.Title" For="@(() => Item.Title)" Label="Title"
+                          Required="true" Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudSelect T="ItemType" @bind-Value="Item.ItemType" Label="Type">
+                @foreach (var t in Enum.GetValues<ItemType>())
+                {
+                    <MudSelectItem T="ItemType" Value="@t">@t</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="ItemStatus" @bind-Value="Item.Status" Label="Status">
+                @foreach (var s in Enum.GetValues<ItemStatus>())
+                {
+                    <MudSelectItem T="ItemStatus" Value="@s">@s</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="Priority?" @bind-Value="Item.Priority" Label="Priority" Clearable="true">
+                <MudSelectItem T="Priority?" Value="@((Priority?)null)">(none)</MudSelectItem>
+                @foreach (var p in Enum.GetValues<Priority>())
+                {
+                    <MudSelectItem T="Priority?" Value="@((Priority?)p)">@p</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudDatePicker @bind-Date="Item.DueDate" Label="Due date" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6">
+            <MudDatePicker @bind-Date="Item.ReminderDate" Label="Reminder date" Clearable="true" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudTextField @bind-Value="Item.Url" For="@(() => Item.Url)" Label="URL"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Link" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudTextField @bind-Value="Item.Body" Label="Body / content" Lines="6" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Tags</MudText>
+            <TagAutocomplete AllTags="AllTags" SelectedTagIds="SelectedTagIds"
+                             SelectedTagIdsChanged="OnTagsChanged" />
+        </MudItem>
+
+        <MudItem xs="6" sm="3" Class="d-flex align-center">
+            <MudSwitch T="bool" @bind-Value="Item.IsPinned" Label="Pinned" Color="Color.Primary" />
+        </MudItem>
+        <MudItem xs="6" sm="3" Class="d-flex align-center">
+            <MudSwitch T="bool" @bind-Value="Item.IsFavorite" Label="Favorite" Color="Color.Warning" />
+        </MudItem>
+    </MudGrid>
+
+    <div class="d-flex justify-end gap-2 mt-4">
+        @if (OnCancel.HasDelegate)
+        {
+            <MudButton OnClick="OnCancel" Variant="Variant.Text">Cancel</MudButton>
+        }
+        <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">@SubmitLabel</MudButton>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public Item Item { get; set; } = default!;
+    [Parameter] public List<Tag> AllTags { get; set; } = new();
+    [Parameter] public List<int> SelectedTagIds { get; set; } = new();
+    [Parameter] public EventCallback<List<int>> SelectedTagIdsChanged { get; set; }
+    [Parameter] public string SubmitLabel { get; set; } = "Save";
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private async Task OnTagsChanged(List<int> ids)
+    {
+        SelectedTagIds = ids;
+        await SelectedTagIdsChanged.InvokeAsync(ids);
+    }
+
+    private Task HandleSubmit() => OnValidSubmit.InvokeAsync();
+}
