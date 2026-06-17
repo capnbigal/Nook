@@ -1,0 +1,116 @@
+@page "/analytics"
+@inject IAnalyticsService AnalyticsService
+@inject ICurrentUser CurrentUser
+
+<PageTitle>Analytics · Nook</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Analytics</MudText>
+
+@if (_model is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="6" md="3">@StatCard("Total items", _model.TotalItems.ToString())</MudItem>
+        <MudItem xs="6" md="3">@StatCard("Completed", _model.CompletedItems.ToString())</MudItem>
+        <MudItem xs="6" md="3">@StatCard("Completion rate", $"{_model.CompletionRatePercent}%")</MudItem>
+        <MudItem xs="6" md="3">@StatCard("Overdue", _model.OverdueCount.ToString())</MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-2">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Items by type</MudText>
+                @if (_model.ByType.Count > 0)
+                {
+                    <MudChart T="double" ChartType="ChartType.Pie"
+                              ChartSeries="@_byTypeSeries"
+                              ChartLabels="@_model.ByType.Select(s => s.Label).ToArray()"
+                              Width="100%" Height="260px" />
+                }
+                else { <MudText Typo="Typo.body2">No data.</MudText> }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Items by status</MudText>
+                @if (_model.ByStatus.Count > 0)
+                {
+                    <MudChart T="double" ChartType="ChartType.Donut"
+                              ChartSeries="@_byStatusSeries"
+                              ChartLabels="@_model.ByStatus.Select(s => s.Label).ToArray()"
+                              Width="100%" Height="260px" />
+                }
+                else { <MudText Typo="Typo.body2">No data.</MudText> }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Weekly activity (created vs completed)</MudText>
+                <MudChart T="double" ChartType="ChartType.Line"
+                          ChartSeries="@_trendSeries"
+                          ChartLabels="@_model.WeeklyTrend.Select(p => p.WeekStart.ToString("M/d")).ToArray()"
+                          Width="100%" Height="300px" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Top tags</MudText>
+                @if (_model.TopTags.Count > 0)
+                {
+                    <MudSimpleTable Dense="true">
+                        <tbody>
+                            @foreach (var t in _model.TopTags)
+                            {
+                                <tr><td>@t.Label</td><td style="text-align:right">@t.Count</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else { <MudText Typo="Typo.body2">No tags yet.</MudText> }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Productivity</MudText>
+                <MudText Typo="Typo.body1">Busiest day: @(_model.BusiestDay?.ToString() ?? "—")</MudText>
+                <MudText Typo="Typo.body1">Untagged items: @_model.UntaggedCount</MudText>
+                <MudText Typo="Typo.body1">Open items: @_model.OpenItems</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private AnalyticsModel? _model;
+    private List<ChartSeries<double>> _trendSeries = new();
+    private List<ChartSeries<double>> _byTypeSeries = new();
+    private List<ChartSeries<double>> _byStatusSeries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userId = await CurrentUser.GetRequiredUserIdAsync();
+        _model = await AnalyticsService.GetForUserAsync(userId);
+
+        _byTypeSeries = _model.ByType
+            .Select(s => new ChartSeries<double> { Name = s.Label, Data = new double[] { s.Count } })
+            .ToList();
+
+        _byStatusSeries = _model.ByStatus
+            .Select(s => new ChartSeries<double> { Name = s.Label, Data = new double[] { s.Count } })
+            .ToList();
+
+        _trendSeries = new List<ChartSeries<double>>
+        {
+            new() { Name = "Created", Data = _model.WeeklyTrend.Select(p => (double)p.Created).ToArray() },
+            new() { Name = "Completed", Data = _model.WeeklyTrend.Select(p => (double)p.Completed).ToArray() }
+        };
+    }
+
+    private RenderFragment StatCard(string label, string value) =>@<MudPaper Class="pa-4 text-center">
+        <MudText Typo="Typo.h4">@value</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@label</MudText>
+    </MudPaper>;
+}
