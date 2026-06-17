@@ -15,6 +15,9 @@ internal sealed class IdentityUserAccessor(
                 "Account/InvalidUser",
                 $"Error: Unable to load user with ID '{userManager.GetUserId(context.User)}'.",
                 context);
+            // RedirectToWithStatus has issued the redirect; the response is
+            // committed, so this return is effectively unreachable.
+            return null!;
         }
         return user;
     }
