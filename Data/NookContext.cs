@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Nook.Models;
 
@@ -9,7 +10,7 @@ namespace Nook.Data;
 /// contexts — the recommended pattern for Blazor Server, where a single
 /// circuit-scoped context is not safe across concurrent component renders.
 /// </summary>
-public class NookContext : DbContext
+public class NookContext : IdentityDbContext<ApplicationUser>
 {
     public NookContext(DbContextOptions<NookContext> options)
         : base(options)
