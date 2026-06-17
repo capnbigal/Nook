@@ -30,6 +30,14 @@ builder.Services.AddAuthentication(options =>
 })
 .AddIdentityCookies();
 
+// Point the cookie challenge at our custom login page (default is /Account/Login),
+// keeping it consistent with the RedirectToLogin component and the /login route.
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/login";
+});
+
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;

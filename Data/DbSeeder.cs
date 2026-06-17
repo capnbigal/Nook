@@ -15,7 +15,12 @@ public static class DbSeeder
 
     public static async Task InitializeAsync(IServiceProvider services)
     {
-        var factory = services.GetRequiredService<IDbContextFactory<NookContext>>();
+        // UserManager is a scoped service and cannot be resolved from the root
+        // provider, so create a scope for the whole seeding operation.
+        using var scope = services.CreateScope();
+        var sp = scope.ServiceProvider;
+
+        var factory = sp.GetRequiredService<IDbContextFactory<NookContext>>();
         await using var db = await factory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
 
@@ -24,7 +29,7 @@ public static class DbSeeder
             return;
         }
 
-        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var userManager = sp.GetRequiredService<UserManager<ApplicationUser>>();
         var demo = await userManager.FindByEmailAsync(DemoEmail);
         if (demo is null)
         {
