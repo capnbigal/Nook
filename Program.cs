@@ -1,7 +1,11 @@
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using Nook.Components;
+using Nook.Components.Account;
 using Nook.Data;
+using Nook.Models;
 using Nook.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +16,31 @@ builder.Services.AddRazorComponents()
 
 // MudBlazor UI services.
 builder.Services.AddMudServices();
+
+// Authentication & Identity.
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<IdentityUserAccessor>();
+builder.Services.AddScoped<IdentityRedirectManager>();
+builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
+})
+.AddIdentityCookies();
+
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
+{
+    options.SignIn.RequireConfirmedAccount = false;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<NookContext>()
+.AddSignInManager()
+.AddDefaultTokenProviders();
 
 // EF Core (SQL Server) via a context factory — the recommended pattern for
 // Blazor Server, where a circuit-scoped context isn't safe across concurrent renders.
@@ -36,12 +65,16 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapAdditionalIdentityEndpoints();
 
 // Apply migrations and seed starter data on startup (Development only).
 // For production, prefer applying migrations as an explicit deployment step.
