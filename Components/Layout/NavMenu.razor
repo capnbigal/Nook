@@ -1,11 +1,86 @@
+@implements IDisposable
+@inject ITagService TagService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
 <MudNavMenu>
     <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
     <MudNavLink Href="/items" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.ViewList">All Items</MudNavLink>
     <MudNavLink Href="/todos" Icon="@Icons.Material.Filled.CheckBox">Todos</MudNavLink>
     <MudNavLink Href="/reminders" Icon="@Icons.Material.Filled.Alarm">Reminders</MudNavLink>
     <MudNavLink Href="/bookmarks" Icon="@Icons.Material.Filled.Bookmark">Bookmarks</MudNavLink>
-    <MudNavLink Href="/tags" Icon="@Icons.Material.Filled.Label">Tags</MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudNavLink Href="/timeline" Icon="@Icons.Material.Filled.Timeline">Timeline</MudNavLink>
+    <MudNavLink Href="/analytics" Icon="@Icons.Material.Filled.BarChart">Analytics</MudNavLink>
+    <MudNavLink Href="/log" Icon="@Icons.Material.Filled.History">Activity Log</MudNavLink>
     <MudNavLink Href="/archive" Icon="@Icons.Material.Filled.Archive">Archive</MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudNavGroup Title="Tags" Icon="@Icons.Material.Filled.Label" Expanded="false">
+        @if (_tags is null)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-2" />
+        }
+        else if (_tags.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="px-4 py-1 mud-text-secondary">No tags yet</MudText>
+        }
+        else
+        {
+            @foreach (var t in _tags)
+            {
+                <MudNavLink Href="@($"/items?tag={Uri.EscapeDataString(t.Name)}")"
+                            Icon="@Icons.Material.Filled.Label">
+                    @t.Name (@t.ItemCount)
+                </MudNavLink>
+            }
+        }
+        <MudNavLink Href="/tags" Icon="@Icons.Material.Filled.MoreHoriz">View all tags</MudNavLink>
+    </MudNavGroup>
+
     <MudDivider Class="my-2" />
     <MudNavLink Href="/items/new" Icon="@Icons.Material.Filled.Add">New Item</MudNavLink>
+
+    <MudDivider Class="my-2" />
+    @if (!string.IsNullOrEmpty(_email))
+    {
+        <MudText Typo="Typo.body2" Class="px-4 py-1 mud-text-secondary">@_email</MudText>
+    }
+    <MudNavLink Href="/Account/Logout" Icon="@Icons.Material.Filled.Logout">Sign out</MudNavLink>
 </MudNavMenu>
+
+@code {
+    private List<TagSummary>? _tags;
+    private string? _email;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        _email = state.User.Identity?.Name;
+
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            _tags = await TagService.GetTagSummaryAsync();
+        }
+        else
+        {
+            _tags = new List<TagSummary>();
+        }
+
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Refresh tag counts as the user navigates (cheap query).
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            _tags = await TagService.GetTagSummaryAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}
