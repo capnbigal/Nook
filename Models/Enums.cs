@@ -30,3 +30,16 @@ public enum Priority
     High,
     Urgent
 }
+
+/// <summary>The kind of change recorded in the activity log. Stored as a string.</summary>
+public enum ActivityType
+{
+    Created,
+    Updated,
+    Completed,
+    Reopened,
+    Archived,
+    Unarchived,
+    Tagged,
+    Deleted
+}

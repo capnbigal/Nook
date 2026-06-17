@@ -7,6 +7,10 @@ public class Tag
 {
     public int TagId { get; set; }
 
+    /// <summary>Owner of this tag. Tags are per-user. FK to ApplicationUser.</summary>
+    public string UserId { get; set; } = string.Empty;
+    public ApplicationUser? User { get; set; }
+
     [Required]
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;

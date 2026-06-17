@@ -21,6 +21,7 @@ public class NookContext : IdentityDbContext<ApplicationUser>
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<ItemTag> ItemTags => Set<ItemTag>();
     public DbSet<ItemLink> ItemLinks => Set<ItemLink>();
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,13 +51,18 @@ public class NookContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(e => e.ItemType);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.DueDate);
+
+            entity.Property(e => e.UserId).IsRequired();
+            entity.HasIndex(e => e.UserId);
         });
 
         modelBuilder.Entity<Tag>(entity =>
         {
             entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Color).HasMaxLength(50);
-            entity.HasIndex(e => e.Name).IsUnique();
+            entity.Property(e => e.UserId).IsRequired();
+            // Tag names are unique PER USER, not globally.
+            entity.HasIndex(e => new { e.UserId, e.Name }).IsUnique();
         });
 
         modelBuilder.Entity<ItemTag>(entity =>
@@ -92,6 +98,14 @@ public class NookContext : IdentityDbContext<ApplicationUser>
 
             // A pair of items can only be linked once in a given direction.
             entity.HasIndex(e => new { e.SourceItemId, e.TargetItemId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ActivityLog>(entity =>
+        {
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ItemTitle).HasMaxLength(300).IsRequired();
+            entity.Property(e => e.Detail).HasMaxLength(500);
+            entity.HasIndex(e => new { e.UserId, e.Timestamp });
         });
     }
 
