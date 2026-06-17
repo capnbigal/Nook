@@ -54,6 +54,9 @@ public class NookContext : IdentityDbContext<ApplicationUser>
 
             entity.Property(e => e.UserId).IsRequired();
             entity.HasIndex(e => e.UserId);
+
+            // Restrict user-delete cascade to avoid multiple-cascade-path through ItemTag.
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Tag>(entity =>
@@ -63,6 +66,9 @@ public class NookContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.UserId).IsRequired();
             // Tag names are unique PER USER, not globally.
             entity.HasIndex(e => new { e.UserId, e.Name }).IsUnique();
+
+            // Restrict user-delete cascade to avoid multiple-cascade-path through ItemTag.
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ItemTag>(entity =>
@@ -106,6 +112,9 @@ public class NookContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.ItemTitle).HasMaxLength(300).IsRequired();
             entity.Property(e => e.Detail).HasMaxLength(500);
             entity.HasIndex(e => new { e.UserId, e.Timestamp });
+
+            // Restrict user-delete cascade to avoid multiple-cascade-path errors.
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 
