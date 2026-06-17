@@ -63,6 +63,7 @@ builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IActivityService, ActivityService>();
+builder.Services.AddScoped<ITimelineService, TimelineService>();
 
 var app = builder.Build();
 

@@ -1,0 +1,62 @@
+@page "/timeline"
+@inject ITimelineService TimelineService
+@inject ICurrentUser CurrentUser
+
+<PageTitle>Timeline · Nook</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Timeline</MudText>
+
+@if (_entries is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_entries.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">Your timeline is empty. Start capturing items!</MudAlert>
+}
+else
+{
+    <MudTimeline TimelinePosition="TimelinePosition.Start">
+        @foreach (var entry in _entries)
+        {
+            @if (entry is ShoutoutEntry shoutout)
+            {
+                <MudTimelineItem Color="Color.Secondary" Icon="@IconFor(shoutout.Icon)">
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudText Typo="Typo.subtitle1">@shoutout.Text</MudText>
+                    </MudPaper>
+                </MudTimelineItem>
+            }
+            else if (entry is DayEntry day)
+            {
+                <MudTimelineItem Color="Color.Primary" Icon="@Icons.Material.Filled.Event">
+                    <MudText Typo="Typo.subtitle2">@day.Date.ToString("dddd, MMM d")</MudText>
+                    @foreach (var ev in day.Events)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            @ev.Type — @ev.ItemTitle
+                        </MudText>
+                    }
+                </MudTimelineItem>
+            }
+        }
+    </MudTimeline>
+}
+
+@code {
+    private List<TimelineEntry>? _entries;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userId = await CurrentUser.GetRequiredUserIdAsync();
+        _entries = await TimelineService.BuildAsync(userId);
+    }
+
+    private static string IconFor(string name) => name switch
+    {
+        "Celebration" => Icons.Material.Filled.Celebration,
+        "NoteAdd" => Icons.Material.Filled.NoteAdd,
+        "TrendingUp" => Icons.Material.Filled.TrendingUp,
+        _ => Icons.Material.Filled.Star
+    };
+}
