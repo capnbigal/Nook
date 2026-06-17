@@ -5,11 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--
-      Leave BlazorDisableThrowNavigationException at its default (unset/false).
-      IdentityRedirectManager.RedirectTo relies on NavigateTo throwing the
-      NavigationException during static SSR to short-circuit; disabling that
-      throw makes the redirect helpers fall through and 500.
+      Suppress the NavigationException that NavigateTo throws during static SSR.
+      With this set, NavigateTo records the redirect and returns (no exception
+      for the debugger to break on); IdentityRedirectManager is written to not
+      depend on the throw. (Do not remove without also restoring the throw in
+      IdentityRedirectManager, or the redirect helpers will 500.)
     -->
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
   <ItemGroup>

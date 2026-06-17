@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Nook.Components.Account;
 
@@ -7,7 +6,10 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
 {
     public const string StatusCookieName = "Identity.StatusMessage";
 
-    [DoesNotReturn]
+    // With <BlazorDisableThrowNavigationException>true</...>, NavigateTo records
+    // the redirect on the response and returns instead of throwing a
+    // NavigationException — so these helpers simply navigate and return. Call
+    // them last in a handler; nothing runs meaningfully after the redirect.
     public void RedirectTo(string? uri)
     {
         uri ??= "";
@@ -16,11 +18,8 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
             uri = navigationManager.ToBaseRelativePath(uri);
         }
         navigationManager.NavigateTo(uri);
-        throw new InvalidOperationException(
-            $"{nameof(IdentityRedirectManager)} can only be used during static rendering.");
     }
 
-    [DoesNotReturn]
     public void RedirectTo(string uri, Dictionary<string, object?> queryParameters)
     {
         var uriWithoutQuery = navigationManager.ToAbsoluteUri(uri).GetLeftPart(UriPartial.Path);
@@ -28,7 +27,6 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
         RedirectTo(newUri);
     }
 
-    [DoesNotReturn]
     public void RedirectToWithStatus(string uri, string message, HttpContext context)
     {
         context.Response.Cookies.Append(StatusCookieName, message,
@@ -36,6 +34,5 @@ internal sealed class IdentityRedirectManager(NavigationManager navigationManage
         RedirectTo(uri);
     }
 
-    [DoesNotReturn]
     public void RedirectToCurrentPage() => RedirectTo("/");
 }
