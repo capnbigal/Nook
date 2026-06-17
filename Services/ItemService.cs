@@ -4,28 +4,27 @@ using Nook.Models;
 
 namespace Nook.Services;
 
-/// <summary>
-/// Default <see cref="IItemService"/> implementation. Each call creates a
-/// short-lived <see cref="NookContext"/> from the factory so the service
-/// is safe to use across concurrent Blazor Server renders.
-/// </summary>
 public class ItemService : IItemService
 {
     private readonly IDbContextFactory<NookContext> _factory;
+    private readonly ICurrentUser _currentUser;
+    private readonly IActivityService _activity;
 
-    public ItemService(IDbContextFactory<NookContext> factory)
+    public ItemService(IDbContextFactory<NookContext> factory, ICurrentUser currentUser, IActivityService activity)
     {
         _factory = factory;
+        _currentUser = currentUser;
+        _activity = activity;
     }
 
-    // Eager-load tags so cards/chips can render without extra round-trips.
     private static IQueryable<Item> WithTags(IQueryable<Item> query) =>
         query.Include(i => i.ItemTags).ThenInclude(it => it.Tag);
 
     public async Task<List<Item>> GetItemsAsync(ItemFilter filter)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        var query = WithTags(db.Items).AsQueryable();
+        var query = WithTags(db.Items).Where(i => i.UserId == userId);
 
         query = filter.ShowArchived
             ? query.Where(i => i.ArchivedAt != null)
@@ -41,18 +40,12 @@ public class ItemService : IItemService
                 i.ItemTags.Any(it => it.Tag.Name.Contains(s)));
         }
 
-        if (filter.ItemType.HasValue)
-            query = query.Where(i => i.ItemType == filter.ItemType.Value);
-        if (filter.Status.HasValue)
-            query = query.Where(i => i.Status == filter.Status.Value);
-        if (filter.Priority.HasValue)
-            query = query.Where(i => i.Priority == filter.Priority.Value);
-        if (filter.TagId.HasValue)
-            query = query.Where(i => i.ItemTags.Any(it => it.TagId == filter.TagId.Value));
-        if (filter.FavoritesOnly)
-            query = query.Where(i => i.IsFavorite);
-        if (filter.PinnedOnly)
-            query = query.Where(i => i.IsPinned);
+        if (filter.ItemType.HasValue) query = query.Where(i => i.ItemType == filter.ItemType.Value);
+        if (filter.Status.HasValue) query = query.Where(i => i.Status == filter.Status.Value);
+        if (filter.Priority.HasValue) query = query.Where(i => i.Priority == filter.Priority.Value);
+        if (filter.TagId.HasValue) query = query.Where(i => i.ItemTags.Any(it => it.TagId == filter.TagId.Value));
+        if (filter.FavoritesOnly) query = query.Where(i => i.IsFavorite);
+        if (filter.PinnedOnly) query = query.Where(i => i.IsPinned);
 
         var now = DateTime.UtcNow;
         if (filter.Overdue)
@@ -72,6 +65,7 @@ public class ItemService : IItemService
 
     public async Task<Item?> GetByIdAsync(int id)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         return await db.Items
             .Include(i => i.ItemTags).ThenInclude(it => it.Tag)
@@ -79,30 +73,32 @@ public class ItemService : IItemService
             .Include(i => i.Children)
             .Include(i => i.OutgoingLinks).ThenInclude(l => l.TargetItem)
             .Include(i => i.IncomingLinks).ThenInclude(l => l.SourceItem)
-            .FirstOrDefaultAsync(i => i.ItemId == id);
+            .FirstOrDefaultAsync(i => i.ItemId == id && i.UserId == userId);
     }
 
     public async Task<Item> CreateAsync(Item item, IEnumerable<int>? tagIds = null)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
+        item.UserId = userId;
         db.Items.Add(item);
         if (tagIds != null)
         {
             foreach (var tagId in tagIds.Distinct())
-            {
                 item.ItemTags.Add(new ItemTag { TagId = tagId });
-            }
         }
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, ActivityType.Created, item.ItemId, item.Title);
         return item;
     }
 
     public async Task UpdateAsync(Item item, IEnumerable<int>? tagIds = null)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         var existing = await db.Items
             .Include(i => i.ItemTags)
-            .FirstOrDefaultAsync(i => i.ItemId == item.ItemId);
+            .FirstOrDefaultAsync(i => i.ItemId == item.ItemId && i.UserId == userId);
         if (existing is null) return;
 
         existing.Title = item.Title;
@@ -123,97 +119,102 @@ public class ItemService : IItemService
         {
             var desired = tagIds.Distinct().ToHashSet();
             foreach (var remove in existing.ItemTags.Where(it => !desired.Contains(it.TagId)).ToList())
-            {
                 existing.ItemTags.Remove(remove);
-            }
             var current = existing.ItemTags.Select(it => it.TagId).ToHashSet();
             foreach (var tagId in desired.Where(t => !current.Contains(t)))
-            {
                 existing.ItemTags.Add(new ItemTag { ItemId = existing.ItemId, TagId = tagId });
-            }
         }
 
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, ActivityType.Updated, existing.ItemId, existing.Title);
     }
 
     public async Task DeleteAsync(int id)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        var item = await db.Items.Include(i => i.Children).FirstOrDefaultAsync(i => i.ItemId == id);
+        var item = await db.Items.Include(i => i.Children)
+            .FirstOrDefaultAsync(i => i.ItemId == id && i.UserId == userId);
         if (item is null) return;
 
-        // Orphan children rather than cascade-deleting them (FK is Restrict).
-        foreach (var child in item.Children)
-        {
-            child.ParentItemId = null;
-        }
-        // Remove manual links pointing at this item (FKs are Restrict).
+        foreach (var child in item.Children) child.ParentItemId = null;
         var links = await db.ItemLinks
-            .Where(l => l.SourceItemId == id || l.TargetItemId == id)
-            .ToListAsync();
+            .Where(l => l.SourceItemId == id || l.TargetItemId == id).ToListAsync();
         db.ItemLinks.RemoveRange(links);
 
-        db.Items.Remove(item); // ItemTags cascade away with the item.
+        var title = item.Title;
+        db.Items.Remove(item);
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, ActivityType.Deleted, null, title);
     }
 
-    public Task ArchiveAsync(int id) => MutateAsync(id, i => i.ArchivedAt = DateTime.UtcNow);
-    public Task UnarchiveAsync(int id) => MutateAsync(id, i => i.ArchivedAt = null);
-    public Task TogglePinAsync(int id) => MutateAsync(id, i => i.IsPinned = !i.IsPinned);
-    public Task ToggleFavoriteAsync(int id) => MutateAsync(id, i => i.IsFavorite = !i.IsFavorite);
+    public Task ArchiveAsync(int id) =>
+        MutateAsync(id, i => i.ArchivedAt = DateTime.UtcNow, ActivityType.Archived);
+    public Task UnarchiveAsync(int id) =>
+        MutateAsync(id, i => i.ArchivedAt = null, ActivityType.Unarchived);
+    public Task TogglePinAsync(int id) =>
+        MutateAsync(id, i => i.IsPinned = !i.IsPinned, ActivityType.Updated);
+    public Task ToggleFavoriteAsync(int id) =>
+        MutateAsync(id, i => i.IsFavorite = !i.IsFavorite, ActivityType.Updated);
 
     public Task CompleteAsync(int id) => MutateAsync(id, i =>
     {
         i.Status = ItemStatus.Done;
         i.CompletedDate = DateTime.UtcNow;
-    });
+    }, ActivityType.Completed);
 
     public Task ReopenAsync(int id) => MutateAsync(id, i =>
     {
         i.Status = ItemStatus.Open;
         i.CompletedDate = null;
-    });
+    }, ActivityType.Reopened);
 
-    private async Task MutateAsync(int id, Action<Item> mutate)
+    private async Task MutateAsync(int id, Action<Item> mutate, ActivityType activityType)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        var item = await db.Items.FindAsync(id);
+        var item = await db.Items.FirstOrDefaultAsync(i => i.ItemId == id && i.UserId == userId);
         if (item is null) return;
         mutate(item);
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, activityType, item.ItemId, item.Title);
     }
 
     public async Task<List<Item>> GetRelatedByTagsAsync(int id, int max = 10)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         var tagIds = await db.ItemTags
             .Where(it => it.ItemId == id)
-            .Select(it => it.TagId)
-            .ToListAsync();
+            .Select(it => it.TagId).ToListAsync();
         if (tagIds.Count == 0) return new List<Item>();
 
         return await WithTags(db.Items)
-            .Where(i => i.ItemId != id && i.ArchivedAt == null
+            .Where(i => i.UserId == userId && i.ItemId != id && i.ArchivedAt == null
                         && i.ItemTags.Any(it => tagIds.Contains(it.TagId)))
             .OrderByDescending(i => i.ItemTags.Count(it => tagIds.Contains(it.TagId)))
             .ThenByDescending(i => i.UpdatedAt)
-            .Take(max)
-            .ToListAsync();
+            .Take(max).ToListAsync();
     }
 
     public async Task<List<Item>> GetChildrenAsync(int id)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         return await WithTags(db.Items)
-            .Where(i => i.ParentItemId == id)
-            .OrderBy(i => i.CreatedAt)
-            .ToListAsync();
+            .Where(i => i.UserId == userId && i.ParentItemId == id)
+            .OrderBy(i => i.CreatedAt).ToListAsync();
     }
 
     public async Task LinkAsync(int sourceId, int targetId, string? linkType = null)
     {
         if (sourceId == targetId) return;
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
+        // Only link items the user owns.
+        var owns = await db.Items.CountAsync(i =>
+            i.UserId == userId && (i.ItemId == sourceId || i.ItemId == targetId));
+        if (owns < 2) return;
         var exists = await db.ItemLinks
             .AnyAsync(l => l.SourceItemId == sourceId && l.TargetItemId == targetId);
         if (exists) return;
@@ -229,117 +230,81 @@ public class ItemService : IItemService
 
     public async Task UnlinkAsync(int itemLinkId)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        var link = await db.ItemLinks.FindAsync(itemLinkId);
+        // Only remove a link the user owns (links are created between the user's
+        // own items, so source ownership identifies the link as theirs).
+        var link = await db.ItemLinks
+            .FirstOrDefaultAsync(l => l.ItemLinkId == itemLinkId && l.SourceItem!.UserId == userId);
         if (link is null) return;
         db.ItemLinks.Remove(link);
         await db.SaveChangesAsync();
     }
 
-    // ---- Dashboard queries ----
+    // ---- Dashboard / Reminders / Todos: all scoped by user ----
 
-    public async Task<List<Item>> GetRecentlyCreatedAsync(int count = 5)
+    private async Task<List<Item>> ScopedActiveAsync(Func<IQueryable<Item>, IQueryable<Item>> shape)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null)
-            .OrderByDescending(i => i.CreatedAt)
-            .Take(count)
-            .ToListAsync();
+        var baseQuery = WithTags(db.Items).Where(i => i.UserId == userId && i.ArchivedAt == null);
+        return await shape(baseQuery).ToListAsync();
     }
 
-    public async Task<List<Item>> GetRecentlyUpdatedAsync(int count = 5)
-    {
-        await using var db = await _factory.CreateDbContextAsync();
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null)
-            .OrderByDescending(i => i.UpdatedAt)
-            .Take(count)
-            .ToListAsync();
-    }
+    public Task<List<Item>> GetRecentlyCreatedAsync(int count = 5) =>
+        ScopedActiveAsync(q => q.OrderByDescending(i => i.CreatedAt).Take(count));
 
-    public async Task<List<Item>> GetDueSoonAsync(int days = 7, int count = 10)
+    public Task<List<Item>> GetRecentlyUpdatedAsync(int count = 5) =>
+        ScopedActiveAsync(q => q.OrderByDescending(i => i.UpdatedAt).Take(count));
+
+    public Task<List<Item>> GetDueSoonAsync(int days = 7, int count = 10)
     {
-        await using var db = await _factory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
         var horizon = now.AddDays(days);
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.Status != ItemStatus.Done
-                        && i.DueDate != null && i.DueDate >= now && i.DueDate <= horizon)
-            .OrderBy(i => i.DueDate)
-            .Take(count)
-            .ToListAsync();
+        return ScopedActiveAsync(q => q
+            .Where(i => i.Status != ItemStatus.Done && i.DueDate != null
+                        && i.DueDate >= now && i.DueDate <= horizon)
+            .OrderBy(i => i.DueDate).Take(count));
     }
 
-    public async Task<List<Item>> GetOverdueAsync(int count = 10)
+    public Task<List<Item>> GetOverdueAsync(int count = 10)
     {
-        await using var db = await _factory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.Status != ItemStatus.Done
-                        && i.DueDate != null && i.DueDate < now)
-            .OrderBy(i => i.DueDate)
-            .Take(count)
-            .ToListAsync();
+        return ScopedActiveAsync(q => q
+            .Where(i => i.Status != ItemStatus.Done && i.DueDate != null && i.DueDate < now)
+            .OrderBy(i => i.DueDate).Take(count));
     }
 
-    public async Task<List<Item>> GetPinnedAsync(int count = 10)
-    {
-        await using var db = await _factory.CreateDbContextAsync();
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.IsPinned)
-            .OrderByDescending(i => i.UpdatedAt)
-            .Take(count)
-            .ToListAsync();
-    }
+    public Task<List<Item>> GetPinnedAsync(int count = 10) =>
+        ScopedActiveAsync(q => q.Where(i => i.IsPinned).OrderByDescending(i => i.UpdatedAt).Take(count));
 
-    public async Task<List<Item>> GetFavoritesAsync(int count = 10)
-    {
-        await using var db = await _factory.CreateDbContextAsync();
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.IsFavorite)
-            .OrderByDescending(i => i.UpdatedAt)
-            .Take(count)
-            .ToListAsync();
-    }
+    public Task<List<Item>> GetFavoritesAsync(int count = 10) =>
+        ScopedActiveAsync(q => q.Where(i => i.IsFavorite).OrderByDescending(i => i.UpdatedAt).Take(count));
 
-    // ---- Reminders / Todos ----
-
-    public async Task<List<Item>> GetUpcomingRemindersAsync()
+    public Task<List<Item>> GetUpcomingRemindersAsync()
     {
-        await using var db = await _factory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.Status != ItemStatus.Done
-                        && i.ReminderDate != null && i.ReminderDate >= now)
-            .OrderBy(i => i.ReminderDate)
-            .ToListAsync();
+        return ScopedActiveAsync(q => q
+            .Where(i => i.Status != ItemStatus.Done && i.ReminderDate != null && i.ReminderDate >= now)
+            .OrderBy(i => i.ReminderDate));
     }
 
-    public async Task<List<Item>> GetOverdueRemindersAsync()
+    public Task<List<Item>> GetOverdueRemindersAsync()
     {
-        await using var db = await _factory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        return await WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.Status != ItemStatus.Done
-                        && i.ReminderDate != null && i.ReminderDate < now)
-            .OrderBy(i => i.ReminderDate)
-            .ToListAsync();
+        return ScopedActiveAsync(q => q
+            .Where(i => i.Status != ItemStatus.Done && i.ReminderDate != null && i.ReminderDate < now)
+            .OrderBy(i => i.ReminderDate));
     }
 
-    public async Task<List<Item>> GetTodosAsync(bool includeCompleted = false)
-    {
-        await using var db = await _factory.CreateDbContextAsync();
-        var query = WithTags(db.Items)
-            .Where(i => i.ArchivedAt == null && i.ItemType == ItemType.Todo);
-        if (!includeCompleted)
-            query = query.Where(i => i.Status != ItemStatus.Done);
-
-        return await query
-            .OrderByDescending(i => i.IsPinned)
-            .ThenBy(i => i.DueDate == null)        // items with a due date first
-            .ThenBy(i => i.DueDate)
-            .ThenByDescending(i => i.CreatedAt)
-            .ToListAsync();
-    }
+    public Task<List<Item>> GetTodosAsync(bool includeCompleted = false) =>
+        ScopedActiveAsync(q =>
+        {
+            q = q.Where(i => i.ItemType == ItemType.Todo);
+            if (!includeCompleted) q = q.Where(i => i.Status != ItemStatus.Done);
+            return q.OrderByDescending(i => i.IsPinned)
+                    .ThenBy(i => i.DueDate == null)
+                    .ThenBy(i => i.DueDate)
+                    .ThenByDescending(i => i.CreatedAt);
+        });
 }

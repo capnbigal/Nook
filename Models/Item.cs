@@ -12,6 +12,10 @@ public class Item
 {
     public int ItemId { get; set; }
 
+    /// <summary>Owner of this item. FK to ApplicationUser.</summary>
+    public string UserId { get; set; } = string.Empty;
+    public ApplicationUser? User { get; set; }
+
     [Required]
     [MaxLength(300)]
     public string Title { get; set; } = string.Empty;

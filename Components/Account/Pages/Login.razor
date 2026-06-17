@@ -1,0 +1,81 @@
+@page "/login"
+@layout Nook.Components.Layout.AuthLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Nook.Components.Account
+@using Nook.Models
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Sign in · Nook</PageTitle>
+
+<MudPaper Class="pa-8" Elevation="3">
+    <MudText Typo="Typo.h4" GutterBottom="true">Welcome back</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">Sign in to your Nook.</MudText>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+    }
+
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="mud-input-label">Email</label>
+            <InputText class="mud-input-root mud-input-root-outlined" @bind-Value="Input.Email"
+                       autocomplete="username" style="width:100%;padding:8px;" />
+            <ValidationMessage For="() => Input.Email" />
+        </div>
+        <div class="mb-3">
+            <label class="mud-input-label">Password</label>
+            <InputText type="password" class="mud-input-root mud-input-root-outlined"
+                       @bind-Value="Input.Password" autocomplete="current-password"
+                       style="width:100%;padding:8px;" />
+            <ValidationMessage For="() => Input.Password" />
+        </div>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                   FullWidth="true" Class="mt-2">Sign in</MudButton>
+    </EditForm>
+
+    <MudText Typo="Typo.body2" Class="mt-4">
+        No account? <MudLink Href="/register">Create one</MudLink>
+    </MudText>
+</MudPaper>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    // BL0008: the `= new()` initializer is required so @bind-Value doesn't
+    // dereference null on the GET render (no form POST supplies the value).
+#pragma warning disable BL0008
+    [SupplyParameterFromForm] private LoginInput Input { get; set; } = new();
+#pragma warning restore BL0008
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    private string? _errorMessage;
+
+    public async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email, Input.Password, isPersistent: true, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            RedirectManager.RedirectTo(ReturnUrl ?? "dashboard");
+        }
+        else
+        {
+            _errorMessage = "Invalid email or password.";
+        }
+    }
+
+    private sealed class LoginInput
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "";
+        [Required, DataType(DataType.Password)] public string Password { get; set; } = "";
+    }
+}

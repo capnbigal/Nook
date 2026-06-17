@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Nook.Data;
 
@@ -11,9 +12,11 @@ using Nook.Data;
 namespace Nook.Data.Migrations
 {
     [DbContext(typeof(NookContext))]
-    partial class NookContextModelSnapshot : ModelSnapshot
+    [Migration("20260617025807_AddIdentityAndActivityLog")]
+    partial class AddIdentityAndActivityLog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

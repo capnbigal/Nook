@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Nook.Models;
 
@@ -9,7 +10,7 @@ namespace Nook.Data;
 /// contexts — the recommended pattern for Blazor Server, where a single
 /// circuit-scoped context is not safe across concurrent component renders.
 /// </summary>
-public class NookContext : DbContext
+public class NookContext : IdentityDbContext<ApplicationUser>
 {
     public NookContext(DbContextOptions<NookContext> options)
         : base(options)
@@ -20,6 +21,7 @@ public class NookContext : DbContext
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<ItemTag> ItemTags => Set<ItemTag>();
     public DbSet<ItemLink> ItemLinks => Set<ItemLink>();
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -49,13 +51,24 @@ public class NookContext : DbContext
             entity.HasIndex(e => e.ItemType);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.DueDate);
+
+            entity.Property(e => e.UserId).IsRequired();
+            entity.HasIndex(e => e.UserId);
+
+            // Restrict user-delete cascade to avoid multiple-cascade-path through ItemTag.
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Tag>(entity =>
         {
             entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Color).HasMaxLength(50);
-            entity.HasIndex(e => e.Name).IsUnique();
+            entity.Property(e => e.UserId).IsRequired();
+            // Tag names are unique PER USER, not globally.
+            entity.HasIndex(e => new { e.UserId, e.Name }).IsUnique();
+
+            // Restrict user-delete cascade to avoid multiple-cascade-path through ItemTag.
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ItemTag>(entity =>
@@ -91,6 +104,17 @@ public class NookContext : DbContext
 
             // A pair of items can only be linked once in a given direction.
             entity.HasIndex(e => new { e.SourceItemId, e.TargetItemId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ActivityLog>(entity =>
+        {
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ItemTitle).HasMaxLength(300).IsRequired();
+            entity.Property(e => e.Detail).HasMaxLength(500);
+            entity.HasIndex(e => new { e.UserId, e.Timestamp });
+
+            // Restrict user-delete cascade to avoid multiple-cascade-path errors.
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

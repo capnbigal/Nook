@@ -1,0 +1,82 @@
+@page "/log"
+@inject IActivityService ActivityService
+@inject ICurrentUser CurrentUser
+
+<PageTitle>Activity Log · Nook</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Activity Log</MudText>
+
+<MudPaper Class="pa-4 mb-4 d-flex gap-4 align-center flex-wrap" Elevation="0">
+    <MudSelect T="ActivityType?" Label="Type" Value="_type" ValueChanged="OnTypeChanged"
+               Clearable="true" Dense="true" Style="min-width:180px;">
+        @foreach (var t in Enum.GetValues<ActivityType>())
+        {
+            <MudSelectItem T="ActivityType?" Value="@t">@t</MudSelectItem>
+        }
+    </MudSelect>
+</MudPaper>
+
+@if (_rows is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_rows.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No activity yet.</MudAlert>
+}
+else
+{
+    <MudTable Items="_rows" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>When</MudTh>
+            <MudTh>Action</MudTh>
+            <MudTh>Item</MudTh>
+            <MudTh>Detail</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="When">@context.Timestamp.ToLocalTime().ToString("g")</MudTd>
+            <MudTd DataLabel="Action">
+                <MudChip T="string" Size="Size.Small" Color="@ColorFor(context.Type)">@context.Type</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Item">
+                @if (context.ItemId is int id)
+                {
+                    <MudLink Href="@($"/items/{id}")">@context.ItemTitle</MudLink>
+                }
+                else
+                {
+                    @context.ItemTitle
+                }
+            </MudTd>
+            <MudTd DataLabel="Detail">@context.Detail</MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<ActivityLog>? _rows;
+    private ActivityType? _type;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task OnTypeChanged(ActivityType? type)
+    {
+        _type = type;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var userId = await CurrentUser.GetRequiredUserIdAsync();
+        _rows = await ActivityService.GetForUserAsync(userId, _type, take: 500);
+    }
+
+    private static Color ColorFor(ActivityType type) => type switch
+    {
+        ActivityType.Created => Color.Success,
+        ActivityType.Completed => Color.Primary,
+        ActivityType.Deleted => Color.Error,
+        ActivityType.Archived => Color.Warning,
+        _ => Color.Default
+    };
+}

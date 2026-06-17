@@ -4,8 +4,21 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!--
+      Leave BlazorDisableThrowNavigationException at its default (unset/false).
+      IdentityRedirectManager.RedirectTo relies on NavigateTo throwing the
+      NavigationException during static SSR to short-circuit; disabling that
+      throw makes the redirect helpers fall through and 500.
+    -->
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Exclude the test project subtree so the web SDK doesn't glob it in. -->
+    <Compile Remove="Nook.Tests/**" />
+    <Content Remove="Nook.Tests/**" />
+    <EmbeddedResource Remove="Nook.Tests/**" />
+    <None Remove="Nook.Tests/**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
@@ -18,6 +31,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="MudBlazor" Version="9.5.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
   </ItemGroup>
 
 </Project>

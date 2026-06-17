@@ -38,6 +38,7 @@ else
     [SupplyParameterFromQuery(Name = "search")] public string? Search { get; set; }
     [SupplyParameterFromQuery(Name = "tagId")] public int? TagId { get; set; }
     [SupplyParameterFromQuery(Name = "type")] public string? Type { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string? TagName { get; set; }
 
     private readonly ItemFilter _filter = new();
     private List<Item> _items = new();
@@ -54,6 +55,13 @@ else
         // Seed the filter from query parameters (global search box, dashboard tag chips, etc.).
         _filter.SearchText = Search;
         _filter.TagId = TagId;
+        // A `tag` name from the nav menu wins over a raw `tagId` if both are present.
+        if (!string.IsNullOrWhiteSpace(TagName))
+        {
+            var match = _allTags.FirstOrDefault(t =>
+                string.Equals(t.Name, TagName, StringComparison.OrdinalIgnoreCase));
+            _filter.TagId = match?.TagId;
+        }
         if (Enum.TryParse<ItemType>(Type, ignoreCase: true, out var type))
         {
             _filter.ItemType = type;
