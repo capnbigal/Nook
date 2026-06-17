@@ -10,7 +10,6 @@
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
-@inject NavigationManager Nav
 
 <PageTitle>Sign in · Nook</PageTitle>
 
@@ -50,7 +49,11 @@
 @code {
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 
+    // BL0008: the `= new()` initializer is required so @bind-Value doesn't
+    // dereference null on the GET render (no form POST supplies the value).
+#pragma warning disable BL0008
     [SupplyParameterFromForm] private LoginInput Input { get; set; } = new();
+#pragma warning restore BL0008
     [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
 
     private string? _errorMessage;

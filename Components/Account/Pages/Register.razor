@@ -56,7 +56,11 @@
 </MudPaper>
 
 @code {
+    // BL0008: the `= new()` initializer is required so @bind-Value doesn't
+    // dereference null on the GET render (no form POST supplies the value).
+#pragma warning disable BL0008
     [SupplyParameterFromForm] private RegisterInput Input { get; set; } = new();
+#pragma warning restore BL0008
     private readonly List<string> _errors = new();
 
     public async Task RegisterUser()

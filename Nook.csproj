@@ -4,7 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!--
+      Leave BlazorDisableThrowNavigationException at its default (unset/false).
+      IdentityRedirectManager.RedirectTo relies on NavigateTo throwing the
+      NavigationException during static SSR to short-circuit; disabling that
+      throw makes the redirect helpers fall through and 500.
+    -->
   </PropertyGroup>
 
   <ItemGroup>
