@@ -61,6 +61,8 @@ builder.Services.AddDbContextFactory<NookContext>(options =>
 // Application services.
 builder.Services.AddScoped<IItemService, ItemService>();
 builder.Services.AddScoped<ITagService, TagService>();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<IActivityService, ActivityService>();
 
 var app = builder.Build();
 
