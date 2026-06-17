@@ -36,15 +36,24 @@
             <label class="mud-input-label">Password</label>
             <InputText type="password" class="mud-input-root mud-input-root-outlined"
                        @bind-Value="Input.Password" autocomplete="new-password"
-                       style="width:100%;padding:8px;" />
+                       data-pw="true" style="width:100%;padding:8px;" />
             <ValidationMessage For="() => Input.Password" />
         </div>
         <div class="mb-3">
             <label class="mud-input-label">Confirm password</label>
             <InputText type="password" class="mud-input-root mud-input-root-outlined"
                        @bind-Value="Input.ConfirmPassword" autocomplete="new-password"
-                       style="width:100%;padding:8px;" />
+                       data-pw="true" style="width:100%;padding:8px;" />
             <ValidationMessage For="() => Input.ConfirmPassword" />
+        </div>
+        @* Reveal both password fields so an autofilled/mismatched value is visible.
+           Inline handler keeps this working on the statically-rendered page (no circuit). *@
+        <div class="mb-3">
+            <label style="cursor:pointer;user-select:none;">
+                <input type="checkbox"
+                       onclick="document.querySelectorAll('input[data-pw]').forEach(function(e){e.type=this.checked?'text':'password';}.bind(this));" />
+                Show password
+            </label>
         </div>
         <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
                    FullWidth="true" Class="mt-2">Create account</MudButton>
