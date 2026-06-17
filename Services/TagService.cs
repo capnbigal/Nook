@@ -8,11 +8,13 @@ public class TagService : ITagService
 {
     private readonly IDbContextFactory<NookContext> _factory;
     private readonly ICurrentUser _currentUser;
+    private readonly IActivityService _activity;
 
-    public TagService(IDbContextFactory<NookContext> factory, ICurrentUser currentUser)
+    public TagService(IDbContextFactory<NookContext> factory, ICurrentUser currentUser, IActivityService activity)
     {
         _factory = factory;
         _currentUser = currentUser;
+        _activity = activity;
     }
 
     public async Task<List<Tag>> GetAllAsync()
@@ -94,24 +96,26 @@ public class TagService : ITagService
         var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         // Both item and tag must belong to the user.
-        var ownsItem = await db.Items.AnyAsync(i => i.ItemId == itemId && i.UserId == userId);
-        var ownsTag = await db.Tags.AnyAsync(t => t.TagId == tagId && t.UserId == userId);
-        if (!ownsItem || !ownsTag) return;
+        var item = await db.Items.FirstOrDefaultAsync(i => i.ItemId == itemId && i.UserId == userId);
+        var tag = await db.Tags.FirstOrDefaultAsync(t => t.TagId == tagId && t.UserId == userId);
+        if (item is null || tag is null) return;
         if (await db.ItemTags.AnyAsync(it => it.ItemId == itemId && it.TagId == tagId)) return;
         db.ItemTags.Add(new ItemTag { ItemId = itemId, TagId = tagId });
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, ActivityType.Tagged, itemId, item.Title, $"added tag '{tag.Name}'");
     }
 
     public async Task RemoveTagAsync(int itemId, int tagId)
     {
         var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        var ownsItem = await db.Items.AnyAsync(i => i.ItemId == itemId && i.UserId == userId);
-        var ownsTag = await db.Tags.AnyAsync(t => t.TagId == tagId && t.UserId == userId);
-        if (!ownsItem || !ownsTag) return;
+        var item = await db.Items.FirstOrDefaultAsync(i => i.ItemId == itemId && i.UserId == userId);
+        var tag = await db.Tags.FirstOrDefaultAsync(t => t.TagId == tagId && t.UserId == userId);
+        if (item is null || tag is null) return;
         var link = await db.ItemTags.FirstOrDefaultAsync(it => it.ItemId == itemId && it.TagId == tagId);
         if (link is null) return;
         db.ItemTags.Remove(link);
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, ActivityType.Tagged, itemId, item.Title, $"removed tag '{tag.Name}'");
     }
 }
