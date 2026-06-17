@@ -46,12 +46,14 @@ public sealed class AnalyticsService : IAnalyticsService
             .OrderByDescending(s => s.Count).ToList();
 
         // Tag insights.
+        // Count only links to items the user owns, so the figure can't be inflated
+        // by a stray cross-user ItemTag even though tags are per-user today.
         var topTags = await db.Tags
             .Where(t => t.UserId == userId)
-            .OrderByDescending(t => t.ItemTags.Count)
+            .OrderByDescending(t => t.ItemTags.Count(it => it.Item.UserId == userId))
             .ThenBy(t => t.Name)
             .Take(10)
-            .Select(t => new CountSlice(t.Name, t.ItemTags.Count))
+            .Select(t => new CountSlice(t.Name, t.ItemTags.Count(it => it.Item.UserId == userId)))
             .ToListAsync();
 
         // Busiest day-of-week by item creation.

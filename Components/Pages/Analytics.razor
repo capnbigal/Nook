@@ -94,13 +94,17 @@ else
         var userId = await CurrentUser.GetRequiredUserIdAsync();
         _model = await AnalyticsService.GetForUserAsync(userId);
 
-        _byTypeSeries = _model.ByType
-            .Select(s => new ChartSeries<double> { Name = s.Label, Data = new double[] { s.Count } })
-            .ToList();
+        // Pie/Donut take a SINGLE series whose Data array holds every slice value;
+        // ChartLabels supplies the per-slice labels. (One-series-per-slice renders wrong.)
+        _byTypeSeries = new List<ChartSeries<double>>
+        {
+            new() { Name = "Items by type", Data = _model.ByType.Select(s => (double)s.Count).ToArray() }
+        };
 
-        _byStatusSeries = _model.ByStatus
-            .Select(s => new ChartSeries<double> { Name = s.Label, Data = new double[] { s.Count } })
-            .ToList();
+        _byStatusSeries = new List<ChartSeries<double>>
+        {
+            new() { Name = "Items by status", Data = _model.ByStatus.Select(s => (double)s.Count).ToArray() }
+        };
 
         _trendSeries = new List<ChartSeries<double>>
         {
