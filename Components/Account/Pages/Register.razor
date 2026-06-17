@@ -1,0 +1,85 @@
+@page "/register"
+@layout Nook.Components.Layout.AuthLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Nook.Components.Account
+@using Nook.Models
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Create account · Nook</PageTitle>
+
+<MudPaper Class="pa-8" Elevation="3">
+    <MudText Typo="Typo.h4" GutterBottom="true">Create your Nook</MudText>
+
+    @if (_errors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            @foreach (var e in _errors) { <div>@e</div> }
+        </MudAlert>
+    }
+
+    <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="mud-input-label">Email</label>
+            <InputText class="mud-input-root mud-input-root-outlined" @bind-Value="Input.Email"
+                       autocomplete="username" style="width:100%;padding:8px;" />
+            <ValidationMessage For="() => Input.Email" />
+        </div>
+        <div class="mb-3">
+            <label class="mud-input-label">Password</label>
+            <InputText type="password" class="mud-input-root mud-input-root-outlined"
+                       @bind-Value="Input.Password" autocomplete="new-password"
+                       style="width:100%;padding:8px;" />
+            <ValidationMessage For="() => Input.Password" />
+        </div>
+        <div class="mb-3">
+            <label class="mud-input-label">Confirm password</label>
+            <InputText type="password" class="mud-input-root mud-input-root-outlined"
+                       @bind-Value="Input.ConfirmPassword" autocomplete="new-password"
+                       style="width:100%;padding:8px;" />
+            <ValidationMessage For="() => Input.ConfirmPassword" />
+        </div>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                   FullWidth="true" Class="mt-2">Create account</MudButton>
+    </EditForm>
+
+    <MudText Typo="Typo.body2" Class="mt-4">
+        Already have an account? <MudLink Href="/login">Sign in</MudLink>
+    </MudText>
+</MudPaper>
+
+@code {
+    [SupplyParameterFromForm] private RegisterInput Input { get; set; } = new();
+    private readonly List<string> _errors = new();
+
+    public async Task RegisterUser()
+    {
+        _errors.Clear();
+        var user = new ApplicationUser { UserName = Input.Email, Email = Input.Email };
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            _errors.AddRange(result.Errors.Select(e => e.Description));
+            return;
+        }
+        await SignInManager.SignInAsync(user, isPersistent: true);
+        RedirectManager.RedirectTo("dashboard");
+    }
+
+    private sealed class RegisterInput
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "";
+        [Required, StringLength(100, MinimumLength = 6)]
+        [DataType(DataType.Password)] public string Password { get; set; } = "";
+        [DataType(DataType.Password)]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

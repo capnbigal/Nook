@@ -1,0 +1,14 @@
+@page "/Account/Logout"
+@layout Nook.Components.Layout.AuthLayout
+@attribute [ExcludeFromInteractiveRouting]
+
+<form action="Account/Logout" method="post">
+    <AntiforgeryToken />
+    <input type="hidden" name="returnUrl" value="" />
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="3">
+        <MudText Typo="Typo.h6" Class="mb-4">Sign out of Nook?</MudText>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">
+            Sign out
+        </MudButton>
+    </MudPaper>
+</form>
