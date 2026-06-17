@@ -226,6 +226,16 @@ public class ItemService : IItemService
             CreatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
+
+        // Record the link on the source item (like the pin/favorite toggles, a
+        // link is an edit of the item, logged as Updated with a descriptive detail).
+        var titles = await db.Items
+            .Where(i => i.ItemId == sourceId || i.ItemId == targetId)
+            .Select(i => new { i.ItemId, i.Title })
+            .ToListAsync();
+        var sourceTitle = titles.FirstOrDefault(t => t.ItemId == sourceId)?.Title ?? string.Empty;
+        var targetTitle = titles.FirstOrDefault(t => t.ItemId == targetId)?.Title ?? string.Empty;
+        await _activity.LogAsync(userId, ActivityType.Updated, sourceId, sourceTitle, $"linked to '{targetTitle}'");
     }
 
     public async Task UnlinkAsync(int itemLinkId)
@@ -235,10 +245,16 @@ public class ItemService : IItemService
         // Only remove a link the user owns (links are created between the user's
         // own items, so source ownership identifies the link as theirs).
         var link = await db.ItemLinks
+            .Include(l => l.SourceItem)
+            .Include(l => l.TargetItem)
             .FirstOrDefaultAsync(l => l.ItemLinkId == itemLinkId && l.SourceItem!.UserId == userId);
         if (link is null) return;
+        var sourceId = link.SourceItemId;
+        var sourceTitle = link.SourceItem?.Title ?? string.Empty;
+        var targetTitle = link.TargetItem?.Title ?? string.Empty;
         db.ItemLinks.Remove(link);
         await db.SaveChangesAsync();
+        await _activity.LogAsync(userId, ActivityType.Updated, sourceId, sourceTitle, $"unlinked from '{targetTitle}'");
     }
 
     // ---- Dashboard / Reminders / Todos: all scoped by user ----

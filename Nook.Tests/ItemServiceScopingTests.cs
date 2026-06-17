@@ -90,4 +90,21 @@ public class ItemServiceScopingTests
         var afterA = await svcA.GetByIdAsync(one.ItemId);
         Assert.Empty(afterA!.OutgoingLinks);
     }
+
+    [Fact]
+    public async Task LinkAsync_and_UnlinkAsync_log_Updated_on_the_source()
+    {
+        var (svc, activity, _) = MakeService("user-a");
+        var one = await svc.CreateAsync(new Item { Title = "One", ItemType = ItemType.Note });
+        var two = await svc.CreateAsync(new Item { Title = "Two", ItemType = ItemType.Note });
+
+        await svc.LinkAsync(one.ItemId, two.ItemId);
+        var afterLink = await activity.GetForUserAsync("user-a", ActivityType.Updated);
+        Assert.Contains(afterLink, u => u.ItemId == one.ItemId && u.Detail!.Contains("linked to 'Two'"));
+
+        var linkId = (await svc.GetByIdAsync(one.ItemId))!.OutgoingLinks.Single().ItemLinkId;
+        await svc.UnlinkAsync(linkId);
+        var afterUnlink = await activity.GetForUserAsync("user-a", ActivityType.Updated);
+        Assert.Contains(afterUnlink, u => u.ItemId == one.ItemId && u.Detail!.Contains("unlinked from 'Two'"));
+    }
 }
