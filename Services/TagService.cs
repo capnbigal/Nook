@@ -107,7 +107,8 @@ public class TagService : ITagService
         var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         var ownsItem = await db.Items.AnyAsync(i => i.ItemId == itemId && i.UserId == userId);
-        if (!ownsItem) return;
+        var ownsTag = await db.Tags.AnyAsync(t => t.TagId == tagId && t.UserId == userId);
+        if (!ownsItem || !ownsTag) return;
         var link = await db.ItemTags.FirstOrDefaultAsync(it => it.ItemId == itemId && it.TagId == tagId);
         if (link is null) return;
         db.ItemTags.Remove(link);

@@ -67,4 +67,27 @@ public class ItemServiceScopingTests
         var completedLogs = await activityA.GetForUserAsync("user-a", ActivityType.Completed);
         Assert.Single(completedLogs);
     }
+
+    [Fact]
+    public async Task UnlinkAsync_ignores_other_users_links()
+    {
+        var (svcA, _, factory) = MakeService("user-a");
+        var one = await svcA.CreateAsync(new Item { Title = "One", ItemType = ItemType.Note });
+        var two = await svcA.CreateAsync(new Item { Title = "Two", ItemType = ItemType.Note });
+        await svcA.LinkAsync(one.ItemId, two.ItemId);
+
+        var withLink = await svcA.GetByIdAsync(one.ItemId);
+        var linkId = withLink!.OutgoingLinks.Single().ItemLinkId;
+
+        // user-b cannot remove user-a's link.
+        var svcB = new ItemService(factory, new FakeCurrentUser("user-b"), new ActivityService(factory));
+        await svcB.UnlinkAsync(linkId);
+        var afterB = await svcA.GetByIdAsync(one.ItemId);
+        Assert.Single(afterB!.OutgoingLinks);
+
+        // user-a can.
+        await svcA.UnlinkAsync(linkId);
+        var afterA = await svcA.GetByIdAsync(one.ItemId);
+        Assert.Empty(afterA!.OutgoingLinks);
+    }
 }

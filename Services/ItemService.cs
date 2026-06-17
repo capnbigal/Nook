@@ -230,8 +230,12 @@ public class ItemService : IItemService
 
     public async Task UnlinkAsync(int itemLinkId)
     {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
-        var link = await db.ItemLinks.FindAsync(itemLinkId);
+        // Only remove a link the user owns (links are created between the user's
+        // own items, so source ownership identifies the link as theirs).
+        var link = await db.ItemLinks
+            .FirstOrDefaultAsync(l => l.ItemLinkId == itemLinkId && l.SourceItem!.UserId == userId);
         if (link is null) return;
         db.ItemLinks.Remove(link);
         await db.SaveChangesAsync();
