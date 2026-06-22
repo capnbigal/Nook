@@ -88,11 +88,9 @@ app.MapRazorComponents<App>()
 
 app.MapAdditionalIdentityEndpoints();
 
-// Apply migrations and seed starter data on startup (Development only).
-// For production, prefer applying migrations as an explicit deployment step.
-if (app.Environment.IsDevelopment())
-{
-    await DbSeeder.InitializeAsync(app.Services);
-}
+// Apply migrations and seed starter data on startup. Runs in every environment
+// so the container creates/migrates its database on first start (the seeder is
+// idempotent — it only inserts the demo user + sample items into an empty DB).
+await DbSeeder.InitializeAsync(app.Services);
 
 app.Run();

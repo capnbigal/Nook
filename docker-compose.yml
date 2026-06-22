@@ -1,0 +1,50 @@
+name: nook
+
+# Nook runs as a single app container on the alibalib platform. It does NOT run
+# its own SQL Server — it shares the existing AWBlazor SQL Server (container
+# "awblazor-sqlserver" on the external "awblazor_default" network) and uses its
+# own database, "Nook". The app auto-migrates + auto-seeds that DB on first start.
+#
+# Deploy on the droplet:
+#   cd /opt/nook
+#   sudo docker compose pull app
+#   sudo docker compose up -d app
+# Roll back to a specific build:  APP_TAG=<short-sha> sudo docker compose up -d app
+
+services:
+  app:
+    # Built + pushed by .github/workflows/build-and-push-image.yml on push to main.
+    image: ghcr.io/capnbigal/nook:${APP_TAG:-latest}
+    container_name: nook-app
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      # Shares the AWBlazor SQL Server; separate database. SA_PASSWORD comes from
+      # .env (use the SAME value as the AWBlazor stack's SA_PASSWORD).
+      ConnectionStrings__DefaultConnection: "Server=awblazor-sqlserver,1433;Database=Nook;User Id=sa;Password=${SA_PASSWORD:?set SA_PASSWORD in .env};TrustServerCertificate=True;Encrypt=False;MultipleActiveResultSets=True"
+      # Observability — opt-in (Nook is not yet OTel-instrumented; these are
+      # harmless placeholders so it can join the Aspire dashboard once wired).
+      OTEL_SERVICE_NAME: nook
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_HEADERS: "x-otlp-api-key=${OTLP_API_KEY:-}"
+    ports:
+      # localhost only — nginx terminates TLS and reverse-proxies to this.
+      - "127.0.0.1:8083:8080"
+    volumes:
+      - nookdata:/app/App_Data
+    networks:
+      - awblazor
+    restart: unless-stopped
+
+networks:
+  # Join the network the AWBlazor stack already created so we can reach
+  # "awblazor-sqlserver" by name (network: awblazor_default).
+  awblazor:
+    external: true
+    name: awblazor_default
+
+volumes:
+  nookdata:
+    name: nook-appdata
