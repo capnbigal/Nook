@@ -22,4 +22,8 @@ public sealed class GraphHarness
     public TagService Tags(string userId) => new(Factory, new FakeCurrentUser(userId), Activity);
 
     public GraphMigrationService Migration() => new(Factory);
+
+    public CryptexService Cryptex(string userId) => new(
+        Factory, new FakeCurrentUser(userId),
+        Nodes(userId), Tags(userId), Collections(userId), Relations(userId));
 }

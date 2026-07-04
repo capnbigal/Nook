@@ -72,6 +72,7 @@ builder.Services.AddScoped<IRelationService, RelationService>();
 builder.Services.AddScoped<ICollectionService, CollectionService>();
 builder.Services.AddScoped<IActionService, ActionService>();
 builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<ICryptexService, CryptexService>();
 builder.Services.AddScoped<IGraphMigrationService, GraphMigrationService>();
 
 // Insights.

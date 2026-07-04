@@ -1,0 +1,257 @@
+@page "/nookryptex"
+@inject ICryptexService Cryptex
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>Nookryptex · Nook</PageTitle>
+
+<div class="nkx">
+    <p class="nkx-title">Nookryptex</p>
+    <p class="nkx-hint">Turn the wheels; the code and matches update above. Add a node and it inherits the code.</p>
+
+    <div class="nkx-nav">
+        <a href="/today">Today</a><a href="/inbox">Inbox</a><a href="/all">All</a><a href="/people">People</a>
+        <a href="/collections">Collections</a><a href="/actions">Actions</a><a href="/events">Events</a><a href="/timeline">Timeline</a>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        var hits = CryptexEngine.Hits(_all, _sel);
+        var node = _focusId is int fid ? _all.FirstOrDefault(n => n.NodeId == fid)
+                   : (hits.Count == 1 ? hits[0] : null);
+
+        <div class="nkx-top">
+            @* The code *@
+            <div class="nkx-sec code">
+                <div class="nkx-label">The code</div>
+                <div class="nkx-content">
+                    @if (_sel.Count == 0)
+                    {
+                        <div class="nkx-empty">No wheels set. Every node is in view.</div>
+                    }
+                    else
+                    {
+                        @foreach (var kv in _sel)
+                        {
+                            <div class="nkx-chip" @onclick="@(() => Clear(kv.Key))"><span>@kv.Value</span><span class="x">✕</span></div>
+                        }
+                    }
+                    <div class="nkx-tally"><b>@hits.Count</b> nodes align</div>
+                </div>
+                @if (_sel.Count > 0)
+                {
+                    <div class="nkx-foot"><button class="nkx-reset" @onclick="Reset">↺ Reset</button></div>
+                }
+            </div>
+
+            @* Locked / focused node *@
+            <div class="nkx-sec detail">
+                <div class="nkx-label">@(node is null ? "Node" : (node.NodeId == _freshId ? "Just added" : (hits.Count == 1 && _focusId is null ? "Locked" : "Focused")))</div>
+                <div class="nkx-content">
+                    @if (node is null)
+                    {
+                        <div class="nkx-placeholder">Turn the wheels to narrow to one node, or pick a match →</div>
+                    }
+                    else
+                    {
+                        <div class="nkx-nodecard">
+                            <div class="nkx-kind">@KindGlyph(node.Kind)</div>
+                            <div>
+                                <h2>@node.Title</h2>
+                                <div class="nkx-meta">@node.Kind · @node.State@(node.Tags.Count > 0 ? " · " + string.Join(" ", node.Tags.Select(t => "#" + t)) : "")</div>
+                                @if (!string.IsNullOrWhiteSpace(node.BodyPreview))
+                                {
+                                    <div class="nkx-body">@node.BodyPreview</div>
+                                }
+                                <div class="nkx-stats"><span><b>@node.Collections.Count</b> collections</span><span><b>@node.People.Count</b> people</span><span><b>@node.Tags.Count</b> tags</span></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                @if (node is not null)
+                {
+                    <div class="nkx-foot"><button class="nkx-open" @onclick="@(() => Open(node.NodeId))">Open node →</button></div>
+                }
+            </div>
+
+            @* Matching nodes *@
+            <div class="nkx-sec matches">
+                <div class="nkx-label">Matching nodes · @hits.Count</div>
+                <div class="nkx-content">
+                    @if (hits.Count == 0)
+                    {
+                        <div class="nkx-empty">No matches.</div>
+                    }
+                    else
+                    {
+                        @foreach (var n in hits)
+                        {
+                            var rcls = "nkx-row" + (_focusId == n.NodeId ? " active" : "") + (n.NodeId == _freshId ? " fresh" : "");
+                            <div class="@rcls" @onclick="@(() => Focus(n.NodeId))">
+                                <span class="ri">@KindGlyph(n.Kind)</span><span class="rt">@n.Title</span><span class="rk">@n.Kind</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* New item line — inherits the code *@
+        <div class="nkx-add">
+            <span class="plus">＋</span>
+            <input class="nkx-addinput" placeholder="Add a new node…" @bind="_newTitle" @bind:event="oninput"
+                   @onkeydown="@(async e => { if (e.Key == "Enter") await Add(); })" />
+            <span class="nkx-willbe">
+                @if (_sel.Count == 0)
+                {
+                    <span>plain node · Unclassified · Inbox</span>
+                }
+                else
+                {
+                    <span>inherits</span>
+                    @foreach (var kv in _sel)
+                    {
+                        <span class="tag">@kv.Value</span>
+                    }
+                }
+            </span>
+            <button class="nkx-addbtn" disabled="@(string.IsNullOrWhiteSpace(_newTitle) || _saving)" @onclick="Add">Add</button>
+        </div>
+
+        <CryptexCylinder Dataset="_all" Selection="_sel" OnSelect="OnSelect" />
+    }
+</div>
+
+<style>
+    /* self-contained cryptex theme, scoped under .nkx */
+    .nkx{--brass:#c8a45c;--brass-dim:#8a7440;--parch:#e8e0cf;--muted:#8b93a3;--ok:#5bbf8a;--toph:206px;--h:372px;
+        color:var(--parch);font-family:'Segoe UI',system-ui,sans-serif}
+    .nkx *{box-sizing:border-box}
+    .nkx-title{font-size:24px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass);font-weight:700;text-align:center;margin:0 0 3px}
+    .nkx-hint{text-align:center;color:var(--muted);font-size:13px;margin:0 0 14px}
+    .nkx-nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+    .nkx-nav a{font-size:12.5px;color:var(--parch);text-decoration:none;padding:6px 12px;border:1px solid #333c50;border-radius:999px;background:linear-gradient(#232b3c,#1a2030)}
+    .nkx-nav a:hover{border-color:var(--brass-dim);color:#fff}
+    .nkx-top{display:flex;gap:14px;margin-bottom:14px}
+    .nkx-sec{height:var(--toph);display:flex;flex-direction:column;overflow:hidden;border:1px solid #2c3446;border-radius:14px;background:linear-gradient(#1d2433,#161c28);padding:12px 14px}
+    .nkx-sec.code{flex:1 1 180px;min-width:160px}
+    .nkx-sec.detail{flex:2 1 300px;min-width:260px;border-top:3px solid var(--brass)}
+    .nkx-sec.matches{flex:1.5 1 240px;min-width:220px}
+    .nkx-label{flex:none;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--brass-dim);margin-bottom:8px}
+    .nkx-content{flex:1;overflow-y:auto}
+    .nkx-foot{flex:none;margin-top:8px}
+    .nkx-chip{display:flex;align-items:center;justify-content:space-between;gap:6px;background:#0e1420;border:1px solid var(--brass-dim);color:var(--brass);padding:5px 10px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:6px}
+    .nkx-chip .x{color:var(--muted)}.nkx-chip:hover .x{color:#fff}
+    .nkx-empty{color:var(--muted);font-size:12.5px}
+    .nkx-tally{margin-top:8px;font-size:12.5px;color:var(--muted)}.nkx-tally b{color:var(--ok);font-size:19px;display:block}
+    .nkx-reset,.nkx-open{cursor:pointer;border-radius:8px;font-size:12.5px}
+    .nkx-reset{color:var(--muted);background:none;border:1px dashed #3a4358;border-radius:999px;padding:5px 12px;width:100%}
+    .nkx-reset:hover{color:var(--parch);border-color:var(--brass-dim)}
+    .nkx-open{border:1px solid #d8b968;background:linear-gradient(#e2c274,#b6923f);color:#20180a;font-weight:600;padding:7px 12px}
+    .nkx-nodecard{display:flex;gap:12px;align-items:flex-start}.nkx-kind{font-size:26px}
+    .nkx-nodecard h2{margin:0 0 4px;font-size:19px}.nkx-meta{color:var(--muted);font-size:12.5px}
+    .nkx-body{color:#cfd6e4;font-size:13.5px;margin-top:6px}
+    .nkx-stats{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12.5px;color:var(--muted)}.nkx-stats b{color:var(--parch)}
+    .nkx-placeholder{color:var(--muted);font-size:13px;display:flex;height:100%;align-items:center;justify-content:center;text-align:center}
+    .nkx-row{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;border:1px solid #262e40;background:#191f2d;cursor:pointer;margin-bottom:6px}
+    .nkx-row:hover{border-color:var(--brass-dim)}.nkx-row.active{border-color:#e2c274;background:#20293a}.nkx-row.fresh{border-color:#5bbf8a55}
+    .nkx-row .ri{font-size:16px}.nkx-row .rt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.nkx-row .rk{font-size:10.5px;color:var(--muted)}
+    .nkx-add{display:flex;align-items:center;gap:12px;border:1px solid var(--brass-dim);border-radius:12px;background:linear-gradient(#20283a,#181e2c);padding:9px 12px;margin-bottom:16px}
+    .nkx-add .plus{width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;background:linear-gradient(#e2c274,#b6923f);color:#20180a;font-size:20px;font-weight:700}
+    .nkx-addinput{flex:1;min-width:80px;background:transparent;border:none;outline:none;color:var(--parch);font-size:15px}
+    .nkx-addinput::placeholder{color:var(--muted)}
+    .nkx-willbe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+    .nkx-willbe .tag{background:#0e1420;border:1px solid var(--brass-dim);color:var(--brass);padding:2px 8px;border-radius:6px;font-size:12px}
+    .nkx-addbtn{cursor:pointer;border:1px solid #d8b968;background:linear-gradient(#e2c274,#b6923f);color:#20180a;font-weight:700;padding:8px 16px;border-radius:8px;font-size:13px;flex:none}
+    .nkx-addbtn:disabled{opacity:.4;cursor:default}
+    .nkx-cylinder{position:relative;display:flex;height:var(--h);border:1px solid #33404f;border-radius:16px;overflow:hidden;background:linear-gradient(90deg,#0d1017,#171d2a 12%,#1b2230 50%,#171d2a 88%,#0d1017);box-shadow:0 16px 44px #0009}
+    .nkx-cylinder::before,.nkx-cylinder::after{content:"";position:absolute;top:0;bottom:0;width:14px;z-index:3;pointer-events:none}
+    .nkx-cylinder::before{left:0;background:linear-gradient(90deg,#b6923f,#8a7440 40%,transparent)}
+    .nkx-cylinder::after{right:0;background:linear-gradient(-90deg,#b6923f,#8a7440 40%,transparent)}
+    .nkx-window{position:absolute;left:14px;right:14px;top:50%;height:46px;transform:translateY(-50%);z-index:2;pointer-events:none;border-top:1px solid #e2c27455;border-bottom:1px solid #e2c27455;background:linear-gradient(#e2c2740f,#e2c27400,#e2c2740f)}
+    .nkx-rings{display:flex;flex:1;min-width:0}
+    .nkx-col{flex:1;min-width:0;position:relative;border-right:1px solid #222a38;display:flex;flex-direction:column}.nkx-col:last-child{border-right:none}
+    .nkx-rlabel{z-index:4;text-align:center;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass-dim);padding:9px 2px 7px;background:linear-gradient(#171d2a,#171d2ad0)}
+    .nkx-rail{flex:1;overflow-y:auto;scroll-behavior:smooth;-webkit-mask-image:linear-gradient(#0000,#000 20%,#000 80%,#0000);mask-image:linear-gradient(#0000,#000 20%,#000 80%,#0000)}
+    .nkx-pad{height:150px}
+    .nkx-items{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 8px}
+    .nkx-item{width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;user-select:none;padding:8px;border-radius:8px;font-size:14px;color:var(--parch);border:1px solid transparent}
+    .nkx-item:hover{background:#222a3a;border-color:#2f3850}
+    .nkx-item.sel{color:#241b09;font-weight:700;border-color:#e2c274;background:linear-gradient(#f0d38f,#c9a352);box-shadow:0 0 0 2px #e2c27455}
+    .nkx-item.dim{opacity:.24;filter:grayscale(.5)}
+    .nkx-n{color:var(--muted);font-size:12px;margin-left:5px}.nkx-item.sel .nkx-n{color:#4d3d17}
+    @@media (max-width:820px){.nkx-top{flex-wrap:wrap}.nkx-cylinder{height:320px}}
+</style>
+
+@code {
+    private List<CryptexNode> _all = new();
+    private readonly Dictionary<CryptexRing, string> _sel = new();
+    private int? _focusId;
+    private int? _freshId;
+    private string? _newTitle;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _scrollPending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _all = await Cryptex.GetDatasetAsync();
+        _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_scrollPending) return;
+        _scrollPending = false;
+        try { await JS.InvokeVoidAsync("nkxScrollCenter"); } catch { /* JS optional */ }
+    }
+
+    private Task OnSelect((CryptexRing Ring, string Value) pick)
+    {
+        if (_sel.TryGetValue(pick.Ring, out var cur) && cur == pick.Value) _sel.Remove(pick.Ring);
+        else _sel[pick.Ring] = pick.Value;
+        _focusId = null;
+        _scrollPending = true;
+        return Task.CompletedTask;
+    }
+
+    private void Clear(CryptexRing ring) { _sel.Remove(ring); _focusId = null; _scrollPending = true; }
+    private void Reset() { _sel.Clear(); _focusId = null; _freshId = null; _scrollPending = true; }
+    private void Focus(int id) => _focusId = id;
+    private void Open(int id) => Nav.NavigateTo($"/nodes/{id}");
+
+    private async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(_newTitle) || _saving) return;
+        _saving = true;
+        try
+        {
+            var id = await Cryptex.AddNodeWithCodeAsync(_newTitle!, _sel);
+            _all = await Cryptex.GetDatasetAsync();
+            _scrollPending = true;
+            _freshId = id;
+            _focusId = id;
+            _newTitle = null;
+        }
+        catch (Exception ex)
+        {
+            // The node may already have been created; refresh so it still appears, and tell the user.
+            _all = await Cryptex.GetDatasetAsync();
+            _scrollPending = true;
+            Snackbar.Add("Couldn't finish adding the node: " + ex.Message, Severity.Warning);
+        }
+        finally { _saving = false; }
+    }
+
+    private static string KindGlyph(NodeKind kind) => kind switch
+    {
+        NodeKind.Note => "📝", NodeKind.Idea => "💡", NodeKind.Event => "📅", NodeKind.Person => "🧑",
+        NodeKind.Project => "📁", NodeKind.Bookmark => "🔖", NodeKind.Place => "📍", NodeKind.Collection => "🗂",
+        _ => "⚡",
+    };
+}
