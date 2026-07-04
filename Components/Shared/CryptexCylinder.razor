@@ -1,0 +1,56 @@
+@* The five-wheel cryptex. Pure presentation: it reads the dataset + selection
+   and raises OnSelect((ring,value)); the parent owns the state. *@
+
+<div class="nkx-cylinder">
+    <div class="nkx-window"></div>
+    <div class="nkx-rings">
+        @foreach (var ring in Rings)
+        {
+            <div class="nkx-col">
+                <div class="nkx-rlabel">@ring.ToString()</div>
+                <div class="nkx-rail">
+                    <div class="nkx-pad"></div>
+                    <div class="nkx-items">
+                        @foreach (var v in CryptexEngine.DistinctValues(Dataset, ring))
+                        {
+                            var count = CryptexEngine.Count(Dataset, Selection, ring, v);
+                            var selected = Selection.TryGetValue(ring, out var sv) && sv == v;
+                            var cls = selected ? "nkx-item sel" : (count == 0 ? "nkx-item dim" : "nkx-item");
+                            <div class="@cls" @onclick="@(() => Pick(ring, v, count, selected))">
+                                @Prefix(ring, v)@v@if (count > 0) { <span class="nkx-n">@count</span>}
+                            </div>
+                        }
+                    </div>
+                    <div class="nkx-pad"></div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<CryptexNode> Dataset { get; set; } = new();
+    [Parameter, EditorRequired] public Dictionary<CryptexRing, string> Selection { get; set; } = new();
+    [Parameter] public EventCallback<(CryptexRing Ring, string Value)> OnSelect { get; set; }
+
+    private static readonly CryptexRing[] Rings =
+        { CryptexRing.Kind, CryptexRing.Tag, CryptexRing.Collection, CryptexRing.State, CryptexRing.People };
+
+    private Task Pick(CryptexRing ring, string value, int count, bool selected)
+        => (count == 0 && !selected) ? Task.CompletedTask : OnSelect.InvokeAsync((ring, value));
+
+    private static string Prefix(CryptexRing r, string v) => r switch
+    {
+        CryptexRing.Kind => IconGlyph(v),
+        CryptexRing.Tag => "#",
+        CryptexRing.People => "🧑 ",
+        _ => "",
+    };
+
+    private static string IconGlyph(string kind) => kind switch
+    {
+        "Note" => "📝 ", "Idea" => "💡 ", "Event" => "📅 ", "Person" => "🧑 ",
+        "Project" => "📁 ", "Bookmark" => "🔖 ", "Place" => "📍 ", "Collection" => "🗂 ",
+        _ => "⚡ ",
+    };
+}
