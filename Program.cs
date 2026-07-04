@@ -59,10 +59,22 @@ builder.Services.AddDbContextFactory<NookContext>(options =>
     options.UseSqlServer(connectionString));
 
 // Application services.
-builder.Services.AddScoped<IItemService, ItemService>();
-builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<IActivityService, ActivityService>();
+builder.Services.AddScoped<ITagService, TagService>();
+
+// Legacy (retained for read-only compatibility redirects post-cutover).
+builder.Services.AddScoped<IItemService, ItemService>();
+
+// Knowledge-graph services (the authoritative model).
+builder.Services.AddScoped<INodeService, NodeService>();
+builder.Services.AddScoped<IRelationService, RelationService>();
+builder.Services.AddScoped<ICollectionService, CollectionService>();
+builder.Services.AddScoped<IActionService, ActionService>();
+builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<IGraphMigrationService, GraphMigrationService>();
+
+// Insights.
 builder.Services.AddScoped<ITimelineService, TimelineService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 

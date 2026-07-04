@@ -15,8 +15,11 @@ public class ActivityLog
     public string UserId { get; set; } = string.Empty;
     public ApplicationUser? User { get; set; }
 
-    /// <summary>The affected item, or null if it has since been deleted.</summary>
+    /// <summary>The affected legacy item, or null. Retained for pre-migration history.</summary>
     public int? ItemId { get; set; }
+
+    /// <summary>The affected node (the graph model), or null if since deleted.</summary>
+    public int? NodeId { get; set; }
 
     /// <summary>Snapshot of the item's title at the time of the event.</summary>
     [MaxLength(300)]

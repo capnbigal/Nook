@@ -9,19 +9,26 @@ public class AnalyticsServiceTests
     private static async Task SeedAsync(TestDbContextFactory factory)
     {
         await using var db = factory.CreateDbContext();
-        db.Items.AddRange(
-            new Item { Title = "n1", ItemType = ItemType.Note, Status = ItemStatus.Open, UserId = "u" },
-            new Item { Title = "t1", ItemType = ItemType.Todo, Status = ItemStatus.Done, UserId = "u",
-                       CompletedDate = DateTime.UtcNow },
-            new Item { Title = "t2", ItemType = ItemType.Todo, Status = ItemStatus.Done, UserId = "u",
-                       CompletedDate = DateTime.UtcNow },
-            // Another user's item must be ignored.
-            new Item { Title = "x", ItemType = ItemType.Note, Status = ItemStatus.Open, UserId = "other" });
+        // Three nodes for user "u" (TotalItems counts nodes), one for another user.
+        db.Nodes.AddRange(
+            new Node { Title = "n1", Kind = NodeKind.Note, State = NodeState.Active, UserId = "u" },
+            new Node { Title = "n2", Kind = NodeKind.Idea, State = NodeState.Active, UserId = "u" },
+            new Node { Title = "n3", Kind = NodeKind.Note, State = NodeState.Active, UserId = "u" },
+            new Node { Title = "x", Kind = NodeKind.Note, State = NodeState.Active, UserId = "other" });
+        // Actions drive completion: 2 done of 3 total for user "u".
+        db.ActionItems.AddRange(
+            new ActionItem { Title = "a1", Kind = ActionKind.Task, Status = ActionStatus.Open, UserId = "u" },
+            new ActionItem { Title = "a2", Kind = ActionKind.Task, Status = ActionStatus.Done, UserId = "u",
+                             CompletedAt = DateTime.UtcNow },
+            new ActionItem { Title = "a3", Kind = ActionKind.Task, Status = ActionStatus.Done, UserId = "u",
+                             CompletedAt = DateTime.UtcNow },
+            new ActionItem { Title = "ax", Kind = ActionKind.Task, Status = ActionStatus.Done, UserId = "other",
+                             CompletedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
     }
 
     [Fact]
-    public async Task GetForUserAsync_counts_only_that_users_items()
+    public async Task GetForUserAsync_counts_only_that_users_nodes_and_actions()
     {
         var factory = new TestDbContextFactory();
         await SeedAsync(factory);
@@ -29,9 +36,9 @@ public class AnalyticsServiceTests
 
         var model = await sut.GetForUserAsync("u");
 
-        Assert.Equal(3, model.TotalItems);
-        Assert.Equal(2, model.CompletedItems);
-        Assert.Equal(1, model.OpenItems);
+        Assert.Equal(3, model.TotalItems);      // nodes owned by "u"
+        Assert.Equal(2, model.CompletedItems);  // done actions
+        Assert.Equal(1, model.OpenItems);       // open actions
     }
 
     [Fact]
@@ -43,7 +50,7 @@ public class AnalyticsServiceTests
 
         var model = await sut.GetForUserAsync("u");
 
-        // 2 of 3 completed ≈ 66.7%.
+        // 2 of 3 actions completed ≈ 66.7%.
         Assert.True(model.CompletionRatePercent > 66 && model.CompletionRatePercent < 67);
     }
 }

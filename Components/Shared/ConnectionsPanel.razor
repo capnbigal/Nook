@@ -1,0 +1,131 @@
+@* Typed connections and backlinks for a node, with an add-relation control. *@
+@inject IRelationService RelationService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-2">Connections</MudText>
+
+    @if (_connections is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        @if (!_connections.Any)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">No connections yet.</MudText>
+        }
+        @if (_connections.Outgoing.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Outgoing</MudText>
+            @foreach (var c in _connections.Outgoing)
+            {
+                @RenderConnection(c, "→")
+            }
+        }
+        @if (_connections.Backlinks.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-3">Backlinks</MudText>
+            @foreach (var c in _connections.Backlinks)
+            {
+                @RenderConnection(c, "←")
+            }
+        }
+    }
+
+    <MudDivider Class="my-3" />
+    @if (!_showAdd)
+    {
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.AddLink"
+                   OnClick="@(() => _showAdd = true)">Add a connection</MudButton>
+    }
+    else
+    {
+        <MudText Typo="Typo.subtitle2" Class="mb-1">Add a connection</MudText>
+        <div class="d-flex gap-2 flex-wrap align-end">
+            <MudSelect T="int" @bind-Value="_relationTypeId" Label="Relationship" Dense="true" Style="min-width:190px;">
+                @foreach (var rt in _relationTypes)
+                {
+                    <MudSelectItem T="int" Value="rt.RelationTypeId">@rt.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <div style="min-width:240px;">
+                <NodeAutocomplete Label="to node…" Value="_target" ValueChanged="OnTargetChanged"
+                                  ExcludeIds="@(new[] { NodeId })" />
+            </div>
+            <MudTextField @bind-Value="_note" Label="Note (optional)" Dense="true" Style="min-width:180px;" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddRelation"
+                       Disabled="@(_target is null || _relationTypeId == 0)">Add</MudButton>
+        </div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public int NodeId { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private NodeConnections? _connections;
+    private List<RelationType> _relationTypes = new();
+    private int _relationTypeId;
+    private Node? _target;
+    private string? _note;
+    private bool _showAdd;
+
+    /// <summary>Reveals the add-connection form (used by the detail page's Add-new column).</summary>
+    public void OpenAdd()
+    {
+        _showAdd = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _relationTypes = await RelationService.GetRelationTypesAsync();
+        if (_relationTypeId == 0)
+            _relationTypeId = _relationTypes.FirstOrDefault()?.RelationTypeId ?? 0;
+        await Reload();
+    }
+
+    private async Task Reload() => _connections = await RelationService.GetConnectionsAsync(NodeId);
+
+    private Task OnTargetChanged(Node? node) { _target = node; return Task.CompletedTask; }
+
+    private async Task AddRelation()
+    {
+        if (_target is null || _relationTypeId == 0) return;
+        var result = await RelationService.AddRelationAsync(NodeId, _target.NodeId, _relationTypeId, _note);
+        switch (result)
+        {
+            case AddRelationResult.Added:
+                Snackbar.Add("Connection added", Severity.Success);
+                _target = null; _note = null;
+                await Reload();
+                if (OnChanged.HasDelegate) await OnChanged.InvokeAsync();
+                break;
+            case AddRelationResult.Duplicate: Snackbar.Add("That connection already exists.", Severity.Info); break;
+            case AddRelationResult.SelfLink: Snackbar.Add("A node can't be connected to itself.", Severity.Warning); break;
+            default: Snackbar.Add("Could not add the connection.", Severity.Error); break;
+        }
+    }
+
+    private async Task Remove(int nodeRelationId)
+    {
+        await RelationService.RemoveRelationAsync(nodeRelationId);
+        await Reload();
+        if (OnChanged.HasDelegate) await OnChanged.InvokeAsync();
+    }
+
+    private RenderFragment RenderConnection(Connection c, string arrow) =>@<div class="d-flex align-center justify-space-between py-1">
+        <div class="d-flex align-center gap-2">
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@c.Label</MudChip>
+            <MudIcon Icon="@NodeUi.Icon(c.OtherKind)" Size="Size.Small" />
+            <MudLink Href="@($"/nodes/{c.OtherNodeId}")">@arrow @c.OtherTitle</MudLink>
+            @if (!string.IsNullOrWhiteSpace(c.Note))
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">— @c.Note</MudText>
+            }
+        </div>
+        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.LinkOff"
+                       OnClick="@(() => Remove(c.NodeRelationId))" title="Remove connection" />
+    </div>;
+}

@@ -1,0 +1,118 @@
+@page "/events"
+@inject IEventService EventService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Events · Nook</PageTitle>
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4" Class="flex-grow-1">Events</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="@(() => _creating = !_creating)">Log event</MudButton>
+</div>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+    Things that happened. Capture a one-liner and a date; add who, what, where and follow-ups later.
+</MudText>
+
+@if (_creating)
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true" Elevation="0">
+        <MudTextField @bind-Value="_title" Label="What happened?" Immediate="true" Variant="Variant.Outlined"
+                      Placeholder="e.g. Met Jamie for coffee" Class="mb-2" />
+        <div class="d-flex gap-2 flex-wrap align-end">
+            <MudDatePicker @bind-Date="_occurred" Label="When" Style="min-width:160px;" />
+            <MudSelect T="int?" @bind-Value="_verbId" Label="Verb (optional)" Dense="true" Clearable="true"
+                       Style="min-width:150px;">
+                @foreach (var v in _verbs)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)v.VerbId)">@v.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Variant="Variant.Text" OnClick="UseSelf" StartIcon="@Icons.Material.Filled.AccountCircle">
+                Subject = me
+            </MudButton>
+        </div>
+        <div class="d-flex gap-2 flex-wrap mt-2">
+            <div style="min-width:200px;">
+                <NodeAutocomplete Label="Subject (who)" Value="_subject"
+                                  ValueChanged="@(n => { _subject = n; return Task.CompletedTask; })" />
+            </div>
+            <div style="min-width:200px;">
+                <NodeAutocomplete Label="Object (what)" Value="_object"
+                                  ValueChanged="@(n => { _object = n; return Task.CompletedTask; })" />
+            </div>
+            <div style="min-width:200px;">
+                <NodeAutocomplete Label="Place (where)" Value="_place" OnlyKind="NodeKind.Place"
+                                  ValueChanged="@(n => { _place = n; return Task.CompletedTask; })" />
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create"
+                       Disabled="@string.IsNullOrWhiteSpace(_title)">Log it</MudButton>
+            <MudButton Variant="Variant.Text" OnClick="@(() => _creating = false)">Cancel</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@if (_events is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_events.Count == 0)
+{
+    <MudPaper Class="pa-6 text-center" Outlined="true" Elevation="0">
+        <MudText Class="mud-text-secondary">No events logged yet.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudTimeline>
+        @foreach (var e in _events)
+        {
+            <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                <ItemContent>
+                    <MudLink Href="@($"/nodes/{e.NodeId}")" Typo="Typo.subtitle1">@e.Title</MudLink>
+                    <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">
+                        @(e.EventDetails?.OccurredAt.ToLocalTime().ToString("f") ?? e.CreatedAt.ToLocalTime().ToString("f"))
+                    </MudText>
+                </ItemContent>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+
+@code {
+    private List<Node>? _events;
+    private List<Verb> _verbs = new();
+    private bool _creating;
+    private string? _title;
+    private DateTime? _occurred = DateTime.Now;
+    private int? _verbId;
+    private Node? _subject;
+    private Node? _object;
+    private Node? _place;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _verbs = await EventService.GetVerbsAsync();
+        await Reload();
+    }
+
+    private async Task Reload() => _events = await EventService.GetTimelineAsync();
+
+    private async Task UseSelf() => _subject = await EventService.GetOrCreateSelfPersonAsync();
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) return;
+        var participants = new List<EventParticipantInput>();
+        var node = await EventService.CreateAsync(
+            _title.Trim(), (_occurred ?? DateTime.Now).ToUniversalTime(), null,
+            _verbId, _subject?.NodeId, _object?.NodeId, _place?.NodeId, participants);
+        Snackbar.Add("Event logged", Severity.Success);
+        _title = null; _subject = null; _object = null; _place = null; _verbId = null; _occurred = DateTime.Now;
+        _creating = false;
+        Nav.NavigateTo($"/nodes/{node.NodeId}");
+    }
+}

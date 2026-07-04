@@ -48,7 +48,7 @@
         var state = await AuthProvider.GetAuthenticationStateAsync();
         if (state.User.Identity?.IsAuthenticated == true)
         {
-            Nav.NavigateTo("/dashboard");
+            Nav.NavigateTo("/today");
         }
     }
 }

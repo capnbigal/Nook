@@ -1,0 +1,108 @@
+@page "/capture"
+@inject INodeService NodeService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Capture · Nook</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
+    <div class="d-flex align-center mb-3 gap-2">
+        <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Large" Color="Color.Primary" />
+        <MudText Typo="Typo.h4">Quick capture</MudText>
+    </div>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+        Just get it down. It lands in your Inbox as an unclassified node — promote, tag, relate,
+        collect or attach actions later.
+    </MudText>
+
+    <MudPaper Class="pa-4" Elevation="1">
+        <MudTextField @bind-Value="_title" Label="What's on your mind?" Immediate="true"
+                      Variant="Variant.Outlined" AutoFocus="true"
+                      OnKeyDown="OnKeyDown" Class="mb-3" />
+        <MudTextField @bind-Value="_body" Label="Details (optional)" Lines="4" Variant="Variant.Outlined" />
+
+        <MudDivider Class="my-4" />
+        @* Optional organisation — works even with zero collections. *@
+        <CollectionAssignmentPanel @ref="_collections" NodeId="null" />
+
+        <div class="d-flex gap-2 mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CaptureAndStay"
+                       Disabled="@(_saving || string.IsNullOrWhiteSpace(_title))">Capture</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="CaptureAndOpen"
+                       Disabled="@(_saving || string.IsNullOrWhiteSpace(_title))">Capture &amp; open</MudButton>
+        </div>
+    </MudPaper>
+
+    @if (_recent.Count > 0)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mt-5 mb-2">Just captured</MudText>
+        @foreach (var n in _recent)
+        {
+            <NodeCard Node="n" ShowActions="false" />
+        }
+    }
+</MudContainer>
+
+@code {
+    private string? _title;
+    private string? _body;
+    private bool _saving;
+    private CollectionAssignmentPanel? _collections;
+    private readonly List<Node> _recent = new();
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && e.CtrlKey) await CaptureAndStay();
+    }
+
+    // Saves the node, then applies any pending collection selections as one workflow.
+    // On any failure the draft (title/body/pending collections) is preserved.
+    private async Task<Node?> DoCapture()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) return null;
+        _saving = true;
+        try
+        {
+            var node = await NodeService.QuickCaptureAsync(_title, _body);
+
+            if (_collections is not null && _collections.HasPending)
+            {
+                var errors = await _collections.ApplyPendingAsync(node.NodeId);
+                if (errors.Count > 0)
+                    Snackbar.Add("Captured, but some collections weren't applied: " + string.Join("; ", errors),
+                        Severity.Warning);
+            }
+
+            // Success — clear the draft and pending selections.
+            _title = null;
+            _body = null;
+            _collections?.ClearPending();
+            if (_collections is not null) await _collections.ReloadAsync();
+            return node;
+        }
+        catch (Exception ex)
+        {
+            // Keep the draft and pending collection choices intact.
+            Snackbar.Add("Couldn't save: " + ex.Message, Severity.Error);
+            return null;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task CaptureAndStay()
+    {
+        var node = await DoCapture();
+        if (node is null) return;
+        _recent.Insert(0, node);
+        Snackbar.Add("Captured to Inbox", Severity.Success);
+    }
+
+    private async Task CaptureAndOpen()
+    {
+        var node = await DoCapture();
+        if (node is not null) Nav.NavigateTo($"/nodes/{node.NodeId}");
+    }
+}

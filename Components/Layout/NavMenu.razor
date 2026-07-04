@@ -4,17 +4,29 @@
 @inject NavigationManager Nav
 
 <MudNavMenu>
-    <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-    <MudNavLink Href="/items" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.ViewList">All Items</MudNavLink>
-    <MudNavLink Href="/todos" Icon="@Icons.Material.Filled.CheckBox">Todos</MudNavLink>
-    <MudNavLink Href="/reminders" Icon="@Icons.Material.Filled.Alarm">Reminders</MudNavLink>
-    <MudNavLink Href="/bookmarks" Icon="@Icons.Material.Filled.Bookmark">Bookmarks</MudNavLink>
+    <MudNavLink Href="/today" Icon="@Icons.Material.Filled.Today">Today</MudNavLink>
+    <MudNavLink Href="/capture" Icon="@Icons.Material.Filled.Bolt">Capture</MudNavLink>
+    <MudNavLink Href="/inbox" Icon="@Icons.Material.Filled.Inbox">Inbox</MudNavLink>
+    <MudNavLink Href="/all" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.AllInbox">All</MudNavLink>
 
     <MudDivider Class="my-2" />
+    <MudNavLink Href="/notes" Icon="@Icons.Material.Filled.Notes">Notes &amp; Records</MudNavLink>
+    <MudNavLink Href="/people" Icon="@Icons.Material.Filled.Person">People</MudNavLink>
+    <MudNavLink Href="/projects" Icon="@Icons.Material.Filled.Folder">Projects</MudNavLink>
+    <MudNavLink Href="/places" Icon="@Icons.Material.Filled.Place">Places</MudNavLink>
+    <MudNavLink Href="/collections" Icon="@Icons.Material.Filled.Collections">Collections</MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudNavLink Href="/actions" Icon="@Icons.Material.Filled.CheckBox">Actions</MudNavLink>
+    <MudNavLink Href="/events" Icon="@Icons.Material.Filled.Event">Events</MudNavLink>
     <MudNavLink Href="/timeline" Icon="@Icons.Material.Filled.Timeline">Timeline</MudNavLink>
     <MudNavLink Href="/analytics" Icon="@Icons.Material.Filled.BarChart">Analytics</MudNavLink>
-    <MudNavLink Href="/log" Icon="@Icons.Material.Filled.History">Activity Log</MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudNavLink Href="/search" Icon="@Icons.Material.Filled.Search">Search</MudNavLink>
+    <MudNavLink Href="/unassigned" Icon="@Icons.Material.Filled.HelpOutline">Unassigned</MudNavLink>
     <MudNavLink Href="/archive" Icon="@Icons.Material.Filled.Archive">Archive</MudNavLink>
+    <MudNavLink Href="/log" Icon="@Icons.Material.Filled.History">Activity log</MudNavLink>
 
     <MudDivider Class="my-2" />
     <MudNavGroup Title="Tags" Icon="@Icons.Material.Filled.Label" Expanded="false">
@@ -30,23 +42,20 @@
         {
             @foreach (var t in _tags)
             {
-                <MudNavLink Href="@($"/items?tag={Uri.EscapeDataString(t.Name)}")"
-                            Icon="@Icons.Material.Filled.Label">
+                <MudNavLink Href="@($"/tags/{t.TagId}")" Icon="@Icons.Material.Filled.Label">
                     @t.Name (@t.ItemCount)
                 </MudNavLink>
             }
         }
-        <MudNavLink Href="/tags" Icon="@Icons.Material.Filled.MoreHoriz">View all tags</MudNavLink>
+        <MudNavLink Href="/tags" Icon="@Icons.Material.Filled.MoreHoriz">Manage tags</MudNavLink>
     </MudNavGroup>
-
-    <MudDivider Class="my-2" />
-    <MudNavLink Href="/items/new" Icon="@Icons.Material.Filled.Add">New Item</MudNavLink>
 
     <MudDivider Class="my-2" />
     @if (!string.IsNullOrEmpty(_email))
     {
         <MudText Typo="Typo.body2" Class="px-4 py-1 mud-text-secondary">@_email</MudText>
     }
+    <MudNavLink Href="/admin/graph-migration" Icon="@Icons.Material.Filled.Storage">Graph migration</MudNavLink>
     <MudNavLink Href="/Account/Logout" Icon="@Icons.Material.Filled.Logout">Sign out</MudNavLink>
 </MudNavMenu>
 
@@ -60,23 +69,15 @@
         _email = state.User.Identity?.Name;
 
         if (state.User.Identity?.IsAuthenticated == true)
-        {
             _tags = await TagService.GetTagSummaryAsync();
-        }
         else
-        {
             _tags = new List<TagSummary>();
-        }
 
         Nav.LocationChanged += OnLocationChanged;
     }
 
     private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        // Refresh tag counts as the user navigates (cheap query). This is an
-        // async void event handler, so a thrown exception can't be observed by a
-        // caller — guard it so a transient failure leaves the existing counts in
-        // place instead of tearing down the circuit.
         try
         {
             var state = await AuthProvider.GetAuthenticationStateAsync();
@@ -88,7 +89,7 @@
         }
         catch
         {
-            // Keep the previously loaded tag counts; the next navigation retries.
+            // Keep previously loaded tag counts; next navigation retries.
         }
     }
 

@@ -83,12 +83,40 @@ public class TagService : ITagService
         var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync();
         // Order on the source before projecting (the projected record can't be ordered in SQL).
+        // Counts are over Nodes (the graph model).
         return await db.Tags
             .Where(t => t.UserId == userId)
-            .OrderByDescending(t => t.ItemTags.Count)
+            .OrderByDescending(t => t.NodeTags.Count)
             .ThenBy(t => t.Name)
-            .Select(t => new TagSummary(t.TagId, t.Name, t.Color, t.ItemTags.Count))
+            .Select(t => new TagSummary(t.TagId, t.Name, t.Color, t.NodeTags.Count))
             .ToListAsync();
+    }
+
+    public async Task AssignToNodeAsync(int nodeId, int tagId)
+    {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
+        await using var db = await _factory.CreateDbContextAsync();
+        var node = await db.Nodes.FirstOrDefaultAsync(n => n.NodeId == nodeId && n.UserId == userId);
+        var tag = await db.Tags.FirstOrDefaultAsync(t => t.TagId == tagId && t.UserId == userId);
+        if (node is null || tag is null) return;
+        if (await db.NodeTags.AnyAsync(nt => nt.NodeId == nodeId && nt.TagId == tagId)) return;
+        db.NodeTags.Add(new NodeTag { NodeId = nodeId, TagId = tagId });
+        await db.SaveChangesAsync();
+        await _activity.LogNodeAsync(userId, ActivityType.Tagged, nodeId, node.Title, $"added tag '{tag.Name}'");
+    }
+
+    public async Task RemoveFromNodeAsync(int nodeId, int tagId)
+    {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
+        await using var db = await _factory.CreateDbContextAsync();
+        var node = await db.Nodes.FirstOrDefaultAsync(n => n.NodeId == nodeId && n.UserId == userId);
+        var tag = await db.Tags.FirstOrDefaultAsync(t => t.TagId == tagId && t.UserId == userId);
+        if (node is null || tag is null) return;
+        var link = await db.NodeTags.FirstOrDefaultAsync(nt => nt.NodeId == nodeId && nt.TagId == tagId);
+        if (link is null) return;
+        db.NodeTags.Remove(link);
+        await db.SaveChangesAsync();
+        await _activity.LogNodeAsync(userId, ActivityType.Tagged, nodeId, node.Title, $"removed tag '{tag.Name}'");
     }
 
     public async Task AssignTagAsync(int itemId, int tagId)

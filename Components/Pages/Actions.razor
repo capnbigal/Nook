@@ -1,0 +1,172 @@
+@page "/actions"
+@inject IActionService ActionService
+@inject ISnackbar Snackbar
+
+<PageTitle>Actions · Nook</PageTitle>
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.CheckBox" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4" Class="flex-grow-1">Actions</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="@(() => _creating = !_creating)">New action</MudButton>
+</div>
+
+@if (_creating)
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true" Elevation="0">
+        <div class="d-flex gap-2 flex-wrap align-end">
+            <MudSelect T="ActionKind" @bind-Value="_newKind" Label="Kind" Dense="true" Style="min-width:130px;">
+                @foreach (var k in new[] { ActionKind.Task, ActionKind.Reminder })
+                {
+                    <MudSelectItem T="ActionKind" Value="k">@k</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_newTitle" Label="Title" Immediate="true" Style="min-width:200px;" />
+            <MudDatePicker @bind-Date="_newDue" Label="Due" Style="min-width:150px;" />
+            <MudDatePicker @bind-Date="_newRemind" Label="Remind" Style="min-width:150px;" />
+            <div style="min-width:220px;">
+                <NodeAutocomplete Label="About node (optional)" Value="_target"
+                                  ValueChanged="@(n => { _target = n; return Task.CompletedTask; })" />
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create"
+                       Disabled="@string.IsNullOrWhiteSpace(_newTitle)">Add</MudButton>
+        </div>
+    </MudPaper>
+}
+
+<MudPaper Class="pa-3 mb-3 d-flex gap-3 flex-wrap align-center" Elevation="0" Outlined="true">
+    <MudSelect T="ActionKind?" Value="_filterKind" Label="Kind" Dense="true" Clearable="true"
+               Style="min-width:130px;" ValueChanged="@(v => { _filterKind = v; return Reload(); })">
+        @foreach (var k in Enum.GetValues<ActionKind>())
+        {
+            <MudSelectItem T="ActionKind?" Value="@((ActionKind?)k)">@k</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSelect T="ActionPriority?" Value="_filterPriority" Label="Priority" Dense="true" Clearable="true"
+               Style="min-width:130px;" ValueChanged="@(v => { _filterPriority = v; return Reload(); })">
+        @foreach (var p in Enum.GetValues<ActionPriority>())
+        {
+            <MudSelectItem T="ActionPriority?" Value="@((ActionPriority?)p)">@p</MudSelectItem>
+        }
+    </MudSelect>
+    <MudSwitch T="bool" Value="_overdue" Label="Overdue" Color="Color.Error"
+               ValueChanged="@(v => { _overdue = v; return Reload(); })" />
+    <MudSwitch T="bool" Value="_reminders" Label="Reminders" Color="Color.Info"
+               ValueChanged="@(v => { _reminders = v; return Reload(); })" />
+    <MudSwitch T="bool" Value="_includeCompleted" Label="Show completed"
+               ValueChanged="@(v => { _includeCompleted = v; return Reload(); })" />
+</MudPaper>
+
+@if (_actions is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_actions.Count == 0)
+{
+    <MudPaper Class="pa-6 text-center" Outlined="true" Elevation="0">
+        <MudText Class="mud-text-secondary">No actions match.</MudText>
+    </MudPaper>
+}
+else
+{
+    @foreach (var a in _actions)
+    {
+        <MudPaper Class="pa-3 mb-2 d-flex align-center gap-2" Elevation="1">
+            <MudCheckBox T="bool" Value="@(a.Status == ActionStatus.Done)" ValueChanged="@(_ => Toggle(a))" Dense="true" />
+            <MudIcon Icon="@NodeUi.ActionIcon(a.Kind)" Size="Size.Small" />
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.body1"
+                         Style="@(a.Status == ActionStatus.Done ? "text-decoration:line-through;opacity:.6;" : "")">
+                    @a.Title
+                </MudText>
+                @if (a.TargetNode is not null)
+                {
+                    <MudLink Href="@($"/nodes/{a.TargetNodeId}")" Typo="Typo.caption">
+                        <MudIcon Icon="@NodeUi.Icon(a.TargetNode.Kind)" Size="Size.Small" /> @a.TargetNode.Title
+                    </MudLink>
+                }
+            </div>
+            @if (a.Priority is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                         Style="@($"color:{NodeUi.PriorityColorHex(a.Priority)};")">@a.Priority</MudChip>
+            }
+            @if (a.DueDate is not null)
+            {
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(a.DueDate < DateTime.UtcNow && a.Status != ActionStatus.Done ? Color.Error : Color.Default)"
+                         Variant="Variant.Text">due @a.DueDate.Value.ToLocalTime().ToString("d")</MudChip>
+            }
+            @if (a.RemindAt is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Alarm" Variant="Variant.Text">
+                    @a.RemindAt.Value.ToLocalTime().ToString("d")
+                </MudChip>
+            }
+            <MudChip T="string" Size="Size.Small" Color="@NodeUi.ActionStatusColor(a.Status)" Variant="Variant.Outlined">@a.Status</MudChip>
+            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true">
+                @if (a.Status != ActionStatus.Cancelled)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => Cancel(a.ActionItemId))">Cancel</MudMenuItem>
+                }
+                <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => Delete(a.ActionItemId))">Delete</MudMenuItem>
+            </MudMenu>
+        </MudPaper>
+    }
+}
+
+@code {
+    private List<ActionItem>? _actions;
+    private bool _creating;
+    private ActionKind _newKind = ActionKind.Task;
+    private string? _newTitle;
+    private DateTime? _newDue;
+    private DateTime? _newRemind;
+    private Node? _target;
+
+    private ActionKind? _filterKind;
+    private ActionPriority? _filterPriority;
+    private bool _overdue;
+    private bool _reminders;
+    private bool _includeCompleted;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _actions = await ActionService.QueryAsync(new ActionFilter
+        {
+            Kind = _filterKind,
+            Priority = _filterPriority,
+            OverdueOnly = _overdue,
+            RemindersOnly = _reminders,
+            IncludeCompleted = _includeCompleted,
+        });
+    }
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(_newTitle)) return;
+        await ActionService.CreateAsync(new ActionItem
+        {
+            Kind = _newKind,
+            Title = _newTitle.Trim(),
+            DueDate = _newDue?.ToUniversalTime(),
+            RemindAt = _newRemind?.ToUniversalTime(),
+            TargetNodeId = _target?.NodeId,
+        });
+        Snackbar.Add("Action created", Severity.Success);
+        _newTitle = null; _newDue = null; _newRemind = null; _target = null; _creating = false;
+        await Reload();
+    }
+
+    private async Task Toggle(ActionItem a)
+    {
+        if (a.Status == ActionStatus.Done) await ActionService.ReopenAsync(a.ActionItemId);
+        else await ActionService.CompleteAsync(a.ActionItemId);
+        await Reload();
+    }
+
+    private async Task Cancel(int id) { await ActionService.CancelAsync(id); await Reload(); }
+    private async Task Delete(int id) { await ActionService.DeleteAsync(id); await Reload(); }
+}

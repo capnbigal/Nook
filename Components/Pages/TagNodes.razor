@@ -1,0 +1,20 @@
+@page "/tags/{Id:int}"
+@inject ITagService TagService
+
+<PageTitle>Tag · Nook</PageTitle>
+
+<NodeListView Title="@_title" Icon="@Icons.Material.Filled.Label"
+              EmptyText="No nodes with this tag." Filter="_filter" ShowDates="true" />
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private string _title = "Tag";
+    private NodeFilter _filter = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _filter = new NodeFilter { TagId = Id };
+        var tag = await TagService.GetByIdAsync(Id);
+        _title = tag is null ? "Tag" : $"#{tag.Name}";
+    }
+}

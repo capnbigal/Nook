@@ -19,5 +19,9 @@ public class Tag
     [MaxLength(50)]
     public string? Color { get; set; }
 
+    /// <summary>Legacy Item assignments (retained until legacy retirement).</summary>
     public ICollection<ItemTag> ItemTags { get; set; } = new List<ItemTag>();
+
+    /// <summary>Node assignments (the graph model).</summary>
+    public ICollection<NodeTag> NodeTags { get; set; } = new List<NodeTag>();
 }

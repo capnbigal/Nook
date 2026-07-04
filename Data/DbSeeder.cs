@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Nook.Models;
+using Nook.Services;
 
 namespace Nook.Data;
 
 /// <summary>
-/// Applies pending migrations and, on an empty database, creates a demo user
-/// (demo@nook.local / Demo123!) and seeds starter items/tags owned by them.
+/// Applies pending schema migrations and seeds system reference data (relation
+/// types + verbs) on every start — both idempotent and non-destructive. On a
+/// brand-new (empty) database it also creates a demo user and a small set of
+/// starter graph nodes. It never runs the legacy Item→Node backfill: that is an
+/// explicit, deliberate operation (see the /admin/graph-migration page).
 /// </summary>
 public static class DbSeeder
 {
@@ -15,8 +19,6 @@ public static class DbSeeder
 
     public static async Task InitializeAsync(IServiceProvider services)
     {
-        // UserManager is a scoped service and cannot be resolved from the root
-        // provider, so create a scope for the whole seeding operation.
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
 
@@ -24,71 +26,59 @@ public static class DbSeeder
         await using var db = await factory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
 
-        if (await db.Tags.AnyAsync() || await db.Items.AnyAsync())
-        {
+        // Always seed system relation types + verbs (idempotent, non-destructive).
+        await sp.GetRequiredService<IGraphMigrationService>().SeedSystemDataAsync();
+
+        // Only seed demo content into a genuinely empty database (no graph and no legacy data).
+        if (await db.Nodes.AnyAsync() || await db.Items.AnyAsync())
             return;
-        }
 
         var userManager = sp.GetRequiredService<UserManager<ApplicationUser>>();
         var demo = await userManager.FindByEmailAsync(DemoEmail);
         if (demo is null)
         {
-            demo = new ApplicationUser
-            {
-                UserName = DemoEmail,
-                Email = DemoEmail,
-                EmailConfirmed = true
-            };
+            demo = new ApplicationUser { UserName = DemoEmail, Email = DemoEmail, EmailConfirmed = true };
             var result = await userManager.CreateAsync(demo, DemoPassword);
             if (!result.Succeeded)
-            {
                 throw new InvalidOperationException(
-                    "Failed to create demo user: " +
-                    string.Join("; ", result.Errors.Select(e => e.Description)));
-            }
+                    "Failed to create demo user: " + string.Join("; ", result.Errors.Select(e => e.Description)));
         }
 
         var uid = demo.Id;
-        var work = new Tag { Name = "work", Color = "#1E88E5", UserId = uid };
         var personal = new Tag { Name = "personal", Color = "#43A047", UserId = uid };
-        var ideas = new Tag { Name = "ideas", Color = "#8E24AA", UserId = uid };
-        db.Tags.AddRange(work, personal, ideas);
+        var reading = new Tag { Name = "reading", Color = "#1E88E5", UserId = uid };
+        db.Tags.AddRange(personal, reading);
 
-        db.Items.AddRange(
-            new Item
-            {
-                Title = "Welcome to Nook",
-                Body = "This is a sample note. Capture notes, todos, reminders, bookmarks, "
-                     + "thoughts, ideas and lists — everything is an \"item\". Use the menu on "
-                     + "the left to explore, and the + button to create your own.",
-                ItemType = ItemType.Note,
-                Status = ItemStatus.Open,
-                IsPinned = true,
-                UserId = uid,
-                ItemTags = new List<ItemTag> { new() { Tag = personal } }
-            },
-            new Item
-            {
-                Title = "Try completing this todo",
-                Body = "Open the Todos page and mark this done.",
-                ItemType = ItemType.Todo,
-                Status = ItemStatus.Open,
-                Priority = Priority.Medium,
-                DueDate = DateTime.UtcNow.AddDays(2),
-                UserId = uid,
-                ItemTags = new List<ItemTag> { new() { Tag = work } }
-            },
-            new Item
-            {
-                Title = "MudBlazor documentation",
-                ItemType = ItemType.Bookmark,
-                Status = ItemStatus.Open,
-                Url = "https://mudblazor.com",
-                UserId = uid,
-                ItemTags = new List<ItemTag> { new() { Tag = ideas } }
-            }
-        );
+        var welcome = new Node
+        {
+            UserId = uid, Kind = NodeKind.Note, State = NodeState.Active, IsPinned = true,
+            Title = "Welcome to Nook",
+            Body = "Capture anything as a node, then connect it. People, projects, notes, "
+                 + "bookmarks and events all live in one graph. Use the + button to capture, "
+                 + "then promote, tag, relate, collect, or attach actions when you're ready.",
+            NodeTags = new List<NodeTag> { new() { Tag = personal } },
+        };
+        var jamie = new Node
+        {
+            UserId = uid, Kind = NodeKind.Person, State = NodeState.Active, Title = "Jamie",
+            Body = "A friend. Try relating notes to Jamie, or make a queue of things to tell them.",
+        };
+        var article = new Node
+        {
+            UserId = uid, Kind = NodeKind.Bookmark, State = NodeState.Active,
+            Title = "MudBlazor documentation", Url = "https://mudblazor.com",
+            NodeTags = new List<NodeTag> { new() { Tag = reading } },
+        };
+        db.Nodes.AddRange(welcome, jamie, article);
+        await db.SaveChangesAsync();
 
+        // A "Read" task attached to the bookmark, showing action-on-any-node.
+        db.ActionItems.Add(new ActionItem
+        {
+            UserId = uid, Kind = ActionKind.Task, Status = ActionStatus.Open,
+            Verb = ActionVerb.Read, Title = "Read the MudBlazor docs",
+            TargetNodeId = article.NodeId, DueDate = DateTime.UtcNow.AddDays(3),
+        });
         await db.SaveChangesAsync();
     }
 }

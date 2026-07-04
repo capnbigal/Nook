@@ -13,8 +13,8 @@
 else
 {
     <MudGrid>
-        <MudItem xs="6" md="3">@StatCard("Total items", _model.TotalItems.ToString())</MudItem>
-        <MudItem xs="6" md="3">@StatCard("Completed", _model.CompletedItems.ToString())</MudItem>
+        <MudItem xs="6" md="3">@StatCard("Total nodes", _model.TotalItems.ToString())</MudItem>
+        <MudItem xs="6" md="3">@StatCard("Actions completed", _model.CompletedItems.ToString())</MudItem>
         <MudItem xs="6" md="3">@StatCard("Completion rate", $"{_model.CompletionRatePercent}%")</MudItem>
         <MudItem xs="6" md="3">@StatCard("Overdue", _model.OverdueCount.ToString())</MudItem>
     </MudGrid>
@@ -22,7 +22,7 @@ else
     <MudGrid Class="mt-2">
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" GutterBottom="true">Items by type</MudText>
+                <MudText Typo="Typo.h6" GutterBottom="true">Nodes by kind</MudText>
                 @if (_model.ByType.Count > 0)
                 {
                     <MudChart T="double" ChartType="ChartType.Pie"
@@ -35,7 +35,7 @@ else
         </MudItem>
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" GutterBottom="true">Items by status</MudText>
+                <MudText Typo="Typo.h6" GutterBottom="true">Actions by status</MudText>
                 @if (_model.ByStatus.Count > 0)
                 {
                     <MudChart T="double" ChartType="ChartType.Donut"
@@ -76,8 +76,8 @@ else
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h6" GutterBottom="true">Productivity</MudText>
                 <MudText Typo="Typo.body1">Busiest day: @(_model.BusiestDay?.ToString() ?? "—")</MudText>
-                <MudText Typo="Typo.body1">Untagged items: @_model.UntaggedCount</MudText>
-                <MudText Typo="Typo.body1">Open items: @_model.OpenItems</MudText>
+                <MudText Typo="Typo.body1">Untagged nodes: @_model.UntaggedCount</MudText>
+                <MudText Typo="Typo.body1">Open actions: @_model.OpenItems</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>

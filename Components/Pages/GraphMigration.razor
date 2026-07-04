@@ -1,0 +1,133 @@
+@page "/admin/graph-migration"
+@inject IGraphMigrationService Migration
+@inject ISnackbar Snackbar
+
+<PageTitle>Graph migration · Nook</PageTitle>
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4">Graph migration</MudText>
+</div>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Explicit, idempotent migration of legacy Items into the graph model. Safe to run more than once.
+    Legacy tables are never modified or deleted here — they remain a rollback snapshot.
+</MudText>
+
+@if (_status is not null)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudText Typo="Typo.h6" Class="mb-2">Status</MudText>
+        <MudSimpleTable Dense="true" Hover="false">
+            <tbody>
+                <tr><td>Legacy Items</td><td>@_status.ItemCount</td></tr>
+                <tr><td>Graph Nodes</td><td>@_status.NodeCount</td></tr>
+                <tr><td>System relation types</td><td>@_status.RelationTypeCount</td></tr>
+                <tr><td>System verbs</td><td>@_status.VerbCount</td></tr>
+                <tr><td>System data seeded</td><td>@YesNo(_status.SystemDataSeeded)</td></tr>
+                <tr><td>Backfill looks complete</td><td>@YesNo(_status.BackfillLooksComplete)</td></tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PlaylistAdd"
+               OnClick="Seed" Disabled="_busy">Seed system data</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SyncAlt"
+               OnClick="Backfill" Disabled="_busy">Run backfill</MudButton>
+    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.FactCheck"
+               OnClick="Validate" Disabled="_busy">Validate</MudButton>
+</div>
+
+@if (_busy)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+
+@if (_backfill is not null)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudText Typo="Typo.h6" Class="mb-2">Last backfill</MudText>
+        <MudSimpleTable Dense="true" Hover="false">
+            <tbody>
+                <tr><td>Nodes created</td><td>@_backfill.NodesCreated</td></tr>
+                <tr><td>Node tags created</td><td>@_backfill.NodeTagsCreated</td></tr>
+                <tr><td>Relations created</td><td>@_backfill.RelationsCreated</td></tr>
+                <tr><td>Contains relations (from parent)</td><td>@_backfill.ContainsRelationsCreated</td></tr>
+                <tr><td>Task actions created</td><td>@_backfill.TaskActionsCreated</td></tr>
+                <tr><td>Reminder actions created</td><td>@_backfill.ReminderActionsCreated</td></tr>
+                <tr><td>Activity log rows linked</td><td>@_backfill.ActivityLogsLinked</td></tr>
+                <tr><td>Skipped DueDates (audited)</td><td>@_backfill.SkippedDueDates</td></tr>
+                <tr><td>Unmapped link labels (audited)</td><td>@_backfill.UnmappedLinkLabels</td></tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@if (_report is not null)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudText Typo="Typo.h6" Class="mb-2">
+            Validation @(_report.AllPassed
+                ? (MarkupString)"<span style='color:green'>— all checks passed</span>"
+                : (MarkupString)"<span style='color:#c62828'>— some checks failed</span>")
+        </MudText>
+        @foreach (var c in _report.Checks)
+        {
+            <div class="d-flex align-center gap-2 py-1">
+                <MudIcon Icon="@(c.Passed ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)"
+                         Color="@(c.Passed ? Color.Success : Color.Error)" Size="Size.Small" />
+                <span class="flex-grow-1">@c.Name</span>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@c.Detail</MudText>
+            </div>
+        }
+        @if (_report.AuditFindings.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-3">Audit findings (@_report.AuditFindings.Count)</MudText>
+            @foreach (var f in _report.AuditFindings.Take(50))
+            {
+                <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">@f</MudText>
+            }
+        }
+    </MudPaper>
+}
+
+@code {
+    private MigrationStatus? _status;
+    private BackfillResult? _backfill;
+    private ValidationReport? _report;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await RefreshStatus();
+
+    private async Task RefreshStatus() => _status = await Migration.GetStatusAsync();
+
+    private async Task Seed()
+    {
+        _busy = true;
+        var added = await Migration.SeedSystemDataAsync();
+        Snackbar.Add($"Seeded {added} system rows", Severity.Success);
+        await RefreshStatus();
+        _busy = false;
+    }
+
+    private async Task Backfill()
+    {
+        _busy = true;
+        _backfill = await Migration.BackfillAsync();
+        Snackbar.Add("Backfill complete", Severity.Success);
+        await RefreshStatus();
+        _busy = false;
+    }
+
+    private async Task Validate()
+    {
+        _busy = true;
+        _report = await Migration.ValidateAsync();
+        Snackbar.Add(_report.AllPassed ? "All checks passed" : "Some checks failed",
+            _report.AllPassed ? Severity.Success : Severity.Warning);
+        _busy = false;
+    }
+
+    private static string YesNo(bool v) => v ? "Yes" : "No";
+}

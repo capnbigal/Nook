@@ -1,0 +1,92 @@
+@page "/collections"
+@inject ICollectionService CollectionService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Collections · Nook</PageTitle>
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.Collections" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4" Class="flex-grow-1">Collections</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="@(() => _creating = !_creating)">New collection</MudButton>
+</div>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+    Folders, lists and queues that organise and order nodes. A node can live in many collections at once.
+</MudText>
+
+@if (_creating)
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true" Elevation="0">
+        <div class="d-flex gap-2 flex-wrap align-end">
+            <MudTextField @bind-Value="_title" Label="Name" Immediate="true" Style="min-width:220px;" />
+            <MudSelect T="CollectionKind" @bind-Value="_kind" Label="Kind" Dense="true" Style="min-width:150px;">
+                @foreach (var k in Enum.GetValues<CollectionKind>())
+                {
+                    <MudSelectItem T="CollectionKind" Value="k">@k</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create"
+                       Disabled="@string.IsNullOrWhiteSpace(_title)">Create</MudButton>
+        </div>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary mt-1">
+            Queues and lists keep their order; folders and plain collections don't.
+        </MudText>
+    </MudPaper>
+}
+
+@if (_collections is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_collections.Count == 0)
+{
+    <MudPaper Class="pa-6 text-center" Outlined="true" Elevation="0">
+        <MudText Class="mud-text-secondary">No collections yet.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudGrid>
+        @foreach (var c in _collections)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4" Elevation="1" Style="cursor:pointer;"
+                          @onclick="@(() => Nav.NavigateTo($"/collections/{c.Node.NodeId}"))">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Collections" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Class="flex-grow-1">@c.Node.Title</MudText>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@c.Kind</MudChip>
+                    </div>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@c.MemberCount item(s)</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<CollectionSummary>? _collections;
+    private bool _creating;
+    private string? _title;
+    private CollectionKind _kind = CollectionKind.Queue;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() => _collections = await CollectionService.GetCollectionsAsync();
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) return;
+        try
+        {
+            var node = await CollectionService.CreateAsync(_title.Trim(), _kind);
+            Snackbar.Add("Collection created", Severity.Success);
+            Nav.NavigateTo($"/collections/{node.NodeId}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

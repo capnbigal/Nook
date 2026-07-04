@@ -20,8 +20,14 @@ public interface ITagService
     Task UpdateAsync(Tag tag);
     Task DeleteAsync(int id);
 
+    /// <summary>Tag list with node usage counts (the graph model).</summary>
     Task<List<TagSummary>> GetTagSummaryAsync();
 
+    // ---- Node assignments (the graph model) ----
+    Task AssignToNodeAsync(int nodeId, int tagId);
+    Task RemoveFromNodeAsync(int nodeId, int tagId);
+
+    // ---- Legacy Item assignments (retained until legacy retirement) ----
     Task AssignTagAsync(int itemId, int tagId);
     Task RemoveTagAsync(int itemId, int tagId);
 }

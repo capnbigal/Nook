@@ -1,0 +1,25 @@
+@* Compatibility redirects from legacy Item routes to the graph model. These are
+   navigation-only shims; they never read or write legacy Item data. *@
+@page "/items"
+@page "/items/new"
+@page "/todos"
+@page "/reminders"
+@page "/bookmarks"
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Nav.Uri);
+        var path = uri.AbsolutePath.TrimEnd('/').ToLowerInvariant();
+        var target = path switch
+        {
+            "/items/new" => "/capture",
+            "/todos" => "/actions",
+            "/reminders" => "/actions",
+            "/bookmarks" => "/notes",
+            _ => "/all",
+        };
+        Nav.NavigateTo(target, replace: true);
+    }
+}

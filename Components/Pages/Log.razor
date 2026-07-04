@@ -39,9 +39,13 @@ else
                 <MudChip T="string" Size="Size.Small" Color="@ColorFor(context.Type)">@context.Type</MudChip>
             </MudTd>
             <MudTd DataLabel="Item">
-                @if (context.ItemId is int id)
+                @if (context.NodeId is int nid)
                 {
-                    <MudLink Href="@($"/items/{id}")">@context.ItemTitle</MudLink>
+                    <MudLink Href="@($"/nodes/{nid}")">@context.ItemTitle</MudLink>
+                }
+                else if (context.ItemId is int id)
+                {
+                    <MudLink Href="@($"/nodes/{id}")">@context.ItemTitle</MudLink>
                 }
                 else
                 {

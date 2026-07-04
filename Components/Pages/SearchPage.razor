@@ -1,0 +1,51 @@
+@page "/search"
+@inject INodeService NodeService
+
+<PageTitle>Search · Nook</PageTitle>
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4">Search</MudText>
+</div>
+
+<MudTextField @bind-Value="_query" Placeholder="Search titles, bodies, URLs and tags…" Immediate="true"
+              Variant="Variant.Outlined" Adornment="Adornment.Start"
+              AdornmentIcon="@Icons.Material.Filled.Search"
+              OnDebounceIntervalElapsed="Run" DebounceInterval="300" Class="mb-4" />
+
+@if (_results is not null)
+{
+    @if (_results.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No matches.</MudText>
+    }
+    else
+    {
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_results.Count result(s)</MudText>
+        @foreach (var n in _results)
+        {
+            <NodeCard Node="n" ShowDate="true" OnChanged="Run" />
+        }
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    private string? _query;
+    private List<Node>? _results;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Q) && _query is null)
+        {
+            _query = Q;
+            await Run();
+        }
+    }
+
+    private async Task Run()
+    {
+        if (string.IsNullOrWhiteSpace(_query)) { _results = null; return; }
+        _results = await NodeService.QueryAsync(new NodeFilter { SearchText = _query });
+    }
+}

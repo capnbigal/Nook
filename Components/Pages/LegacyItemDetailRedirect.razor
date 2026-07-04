@@ -1,0 +1,9 @@
+@* Legacy /items/{id} → /nodes/{id}. Node ids equal the original Item ids after
+   backfill, so the same URL points at the migrated node. *@
+@page "/items/{Id:int}"
+@inject NavigationManager Nav
+
+@code {
+    [Parameter] public int Id { get; set; }
+    protected override void OnInitialized() => Nav.NavigateTo($"/nodes/{Id}", replace: true);
+}

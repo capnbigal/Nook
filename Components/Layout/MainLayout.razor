@@ -12,12 +12,12 @@
         <MudText Typo="Typo.h6" Class="ml-2">Nook</MudText>
         <MudSpacer />
         <MudTextField T="string" @bind-Value="_search" Immediate="true"
-                      Placeholder="Search items…" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Placeholder="Search…" Variant="Variant.Outlined" Margin="Margin.Dense"
                       Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                       Class="mt-0 mx-2 d-none d-sm-flex" Style="max-width:320px;"
                       OnKeyUp="OnSearchKeyUp" />
         <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Inherit"
-                       Href="/items/new" title="New item" />
+                       Href="/capture" title="Quick capture" />
         <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit" OnClick="@(() => _isDarkMode = !_isDarkMode)" title="Toggle light/dark" />
     </MudAppBar>
@@ -56,7 +56,7 @@
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_search))
         {
-            Nav.NavigateTo($"/items?search={Uri.EscapeDataString(_search.Trim())}");
+            Nav.NavigateTo($"/search?q={Uri.EscapeDataString(_search.Trim())}");
         }
     }
 }

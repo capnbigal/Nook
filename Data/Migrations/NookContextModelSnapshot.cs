@@ -155,6 +155,108 @@ namespace Nook.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Nook.Models.ActionContext", b =>
+                {
+                    b.Property<int>("ActionItemId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("ActionItemId", "NodeId", "Role");
+
+                    b.HasIndex("NodeId");
+
+                    b.HasIndex("UserId", "NodeId", "Role");
+
+                    b.ToTable("ActionContexts");
+                });
+
+            modelBuilder.Entity("Nook.Models.ActionItem", b =>
+                {
+                    b.Property<int>("ActionItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ActionItemId"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("ParentActionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Priority")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("RemindAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("TargetNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Verb")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("ActionItemId");
+
+                    b.HasIndex("ParentActionId");
+
+                    b.HasIndex("TargetNodeId");
+
+                    b.HasIndex("UserId", "RemindAt");
+
+                    b.HasIndex("UserId", "Status", "DueDate");
+
+                    b.ToTable("ActionItems");
+                });
+
             modelBuilder.Entity("Nook.Models.ActivityLog", b =>
                 {
                     b.Property<int>("ActivityLogId")
@@ -175,6 +277,9 @@ namespace Nook.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<int?>("NodeId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime2");
 
@@ -188,6 +293,8 @@ namespace Nook.Data.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.HasKey("ActivityLogId");
+
+                    b.HasIndex("UserId", "NodeId");
 
                     b.HasIndex("UserId", "Timestamp");
 
@@ -239,6 +346,9 @@ namespace Nook.Data.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("SelfNodeId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
 
@@ -256,7 +366,118 @@ namespace Nook.Data.Migrations
                         .HasDatabaseName("UserNameIndex")
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
+                    b.HasIndex("SelfNodeId");
+
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("Nook.Models.Collection", b =>
+                {
+                    b.Property<int>("NodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsOrdered")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("NodeId");
+
+                    b.ToTable("Collections");
+                });
+
+            modelBuilder.Entity("Nook.Models.CollectionMembership", b =>
+                {
+                    b.Property<int>("CollectionNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MemberNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("AddedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("CollectionNodeId", "MemberNodeId");
+
+                    b.HasIndex("MemberNodeId");
+
+                    b.HasIndex("CollectionNodeId", "SortOrder");
+
+                    b.ToTable("CollectionMemberships");
+                });
+
+            modelBuilder.Entity("Nook.Models.EventDetails", b =>
+                {
+                    b.Property<int>("NodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ObjectNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PlaceNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SubjectNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("VerbId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NodeId");
+
+                    b.HasIndex("ObjectNodeId");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("PlaceNodeId");
+
+                    b.HasIndex("SubjectNodeId");
+
+                    b.HasIndex("VerbId");
+
+                    b.ToTable("EventDetails");
+                });
+
+            modelBuilder.Entity("Nook.Models.EventParticipant", b =>
+                {
+                    b.Property<int>("EventNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ParticipantNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("EventNodeId", "ParticipantNodeId", "Role");
+
+                    b.HasIndex("ParticipantNodeId");
+
+                    b.ToTable("EventParticipants");
                 });
 
             modelBuilder.Entity("Nook.Models.Item", b =>
@@ -391,6 +612,210 @@ namespace Nook.Data.Migrations
                     b.ToTable("ItemTags");
                 });
 
+            modelBuilder.Entity("Nook.Models.MigrationAudit", b =>
+                {
+                    b.Property<int>("MigrationAuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MigrationAuditId"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int?>("LegacyItemId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MigrationAuditId");
+
+                    b.HasIndex("Category");
+
+                    b.ToTable("MigrationAudits");
+                });
+
+            modelBuilder.Entity("Nook.Models.Node", b =>
+                {
+                    b.Property<int>("NodeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NodeId"));
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Body")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<bool>("IsFavorite")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("NodeId");
+
+                    b.HasIndex("UserId", "IsPinned")
+                        .HasFilter("[IsPinned] = 1");
+
+                    b.HasIndex("UserId", "Kind");
+
+                    b.HasIndex("UserId", "State");
+
+                    b.HasIndex("UserId", "UpdatedAt");
+
+                    b.ToTable("Nodes");
+                });
+
+            modelBuilder.Entity("Nook.Models.NodeRelation", b =>
+                {
+                    b.Property<int>("NodeRelationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NodeRelationId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("RelationTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetNodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("NodeRelationId");
+
+                    b.HasIndex("RelationTypeId");
+
+                    b.HasIndex("SourceNodeId");
+
+                    b.HasIndex("TargetNodeId", "RelationTypeId");
+
+                    b.HasIndex("UserId", "SourceNodeId", "TargetNodeId", "RelationTypeId")
+                        .IsUnique();
+
+                    b.ToTable("NodeRelations");
+                });
+
+            modelBuilder.Entity("Nook.Models.NodeTag", b =>
+                {
+                    b.Property<int>("NodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NodeId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("NodeTags");
+                });
+
+            modelBuilder.Entity("Nook.Models.RelationType", b =>
+                {
+                    b.Property<int>("RelationTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RelationTypeId"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("InverseName")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<bool>("IsSymmetric")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("RelationTypeId");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RelationType_System")
+                        .HasFilter("[UserId] IS NULL");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RelationType_User")
+                        .HasFilter("[UserId] IS NOT NULL");
+
+                    b.ToTable("RelationTypes");
+                });
+
             modelBuilder.Entity("Nook.Models.Tag", b =>
                 {
                     b.Property<int>("TagId")
@@ -418,6 +843,40 @@ namespace Nook.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Tags");
+                });
+
+            modelBuilder.Entity("Nook.Models.Verb", b =>
+                {
+                    b.Property<int>("VerbId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VerbId"));
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("VerbId");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Verb_System")
+                        .HasFilter("[UserId] IS NULL");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Verb_User")
+                        .HasFilter("[UserId] IS NOT NULL");
+
+                    b.ToTable("Verbs");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -471,6 +930,50 @@ namespace Nook.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Nook.Models.ActionContext", b =>
+                {
+                    b.HasOne("Nook.Models.ActionItem", "ActionItem")
+                        .WithMany("Contexts")
+                        .HasForeignKey("ActionItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Node", "Node")
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ActionItem");
+
+                    b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("Nook.Models.ActionItem", b =>
+                {
+                    b.HasOne("Nook.Models.ActionItem", "ParentAction")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentActionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nook.Models.Node", "TargetNode")
+                        .WithMany()
+                        .HasForeignKey("TargetNodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nook.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ParentAction");
+
+                    b.Navigation("TargetNode");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Nook.Models.ActivityLog", b =>
                 {
                     b.HasOne("Nook.Models.ApplicationUser", "User")
@@ -480,6 +983,104 @@ namespace Nook.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nook.Models.ApplicationUser", b =>
+                {
+                    b.HasOne("Nook.Models.Node", "SelfNode")
+                        .WithMany()
+                        .HasForeignKey("SelfNodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("SelfNode");
+                });
+
+            modelBuilder.Entity("Nook.Models.Collection", b =>
+                {
+                    b.HasOne("Nook.Models.Node", "Node")
+                        .WithOne("Collection")
+                        .HasForeignKey("Nook.Models.Collection", "NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("Nook.Models.CollectionMembership", b =>
+                {
+                    b.HasOne("Nook.Models.Collection", "Collection")
+                        .WithMany("Memberships")
+                        .HasForeignKey("CollectionNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Node", "MemberNode")
+                        .WithMany()
+                        .HasForeignKey("MemberNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Collection");
+
+                    b.Navigation("MemberNode");
+                });
+
+            modelBuilder.Entity("Nook.Models.EventDetails", b =>
+                {
+                    b.HasOne("Nook.Models.Node", "Node")
+                        .WithOne("EventDetails")
+                        .HasForeignKey("Nook.Models.EventDetails", "NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Node", "ObjectNode")
+                        .WithMany()
+                        .HasForeignKey("ObjectNodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nook.Models.Node", "PlaceNode")
+                        .WithMany()
+                        .HasForeignKey("PlaceNodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nook.Models.Node", "SubjectNode")
+                        .WithMany()
+                        .HasForeignKey("SubjectNodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nook.Models.Verb", "Verb")
+                        .WithMany("Events")
+                        .HasForeignKey("VerbId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Node");
+
+                    b.Navigation("ObjectNode");
+
+                    b.Navigation("PlaceNode");
+
+                    b.Navigation("SubjectNode");
+
+                    b.Navigation("Verb");
+                });
+
+            modelBuilder.Entity("Nook.Models.EventParticipant", b =>
+                {
+                    b.HasOne("Nook.Models.EventDetails", "Event")
+                        .WithMany("Participants")
+                        .HasForeignKey("EventNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Node", "ParticipantNode")
+                        .WithMany()
+                        .HasForeignKey("ParticipantNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("ParticipantNode");
                 });
 
             modelBuilder.Entity("Nook.Models.Item", b =>
@@ -538,6 +1139,81 @@ namespace Nook.Data.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("Nook.Models.Node", b =>
+                {
+                    b.HasOne("Nook.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nook.Models.NodeRelation", b =>
+                {
+                    b.HasOne("Nook.Models.RelationType", "RelationType")
+                        .WithMany("Relations")
+                        .HasForeignKey("RelationTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Node", "SourceNode")
+                        .WithMany("OutgoingRelations")
+                        .HasForeignKey("SourceNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Node", "TargetNode")
+                        .WithMany("IncomingRelations")
+                        .HasForeignKey("TargetNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RelationType");
+
+                    b.Navigation("SourceNode");
+
+                    b.Navigation("TargetNode");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nook.Models.NodeTag", b =>
+                {
+                    b.HasOne("Nook.Models.Node", "Node")
+                        .WithMany("NodeTags")
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nook.Models.Tag", "Tag")
+                        .WithMany("NodeTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Node");
+
+                    b.Navigation("Tag");
+                });
+
+            modelBuilder.Entity("Nook.Models.RelationType", b =>
+                {
+                    b.HasOne("Nook.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Nook.Models.Tag", b =>
                 {
                     b.HasOne("Nook.Models.ApplicationUser", "User")
@@ -547,6 +1223,33 @@ namespace Nook.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nook.Models.Verb", b =>
+                {
+                    b.HasOne("Nook.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nook.Models.ActionItem", b =>
+                {
+                    b.Navigation("Children");
+
+                    b.Navigation("Contexts");
+                });
+
+            modelBuilder.Entity("Nook.Models.Collection", b =>
+                {
+                    b.Navigation("Memberships");
+                });
+
+            modelBuilder.Entity("Nook.Models.EventDetails", b =>
+                {
+                    b.Navigation("Participants");
                 });
 
             modelBuilder.Entity("Nook.Models.Item", b =>
@@ -560,9 +1263,34 @@ namespace Nook.Data.Migrations
                     b.Navigation("OutgoingLinks");
                 });
 
+            modelBuilder.Entity("Nook.Models.Node", b =>
+                {
+                    b.Navigation("Collection");
+
+                    b.Navigation("EventDetails");
+
+                    b.Navigation("IncomingRelations");
+
+                    b.Navigation("NodeTags");
+
+                    b.Navigation("OutgoingRelations");
+                });
+
+            modelBuilder.Entity("Nook.Models.RelationType", b =>
+                {
+                    b.Navigation("Relations");
+                });
+
             modelBuilder.Entity("Nook.Models.Tag", b =>
                 {
                     b.Navigation("ItemTags");
+
+                    b.Navigation("NodeTags");
+                });
+
+            modelBuilder.Entity("Nook.Models.Verb", b =>
+                {
+                    b.Navigation("Events");
                 });
 #pragma warning restore 612, 618
         }

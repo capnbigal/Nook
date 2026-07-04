@@ -1,0 +1,11 @@
+@page "/people"
+<PageTitle>People · Nook</PageTitle>
+
+<NodeListView Title="People" Icon="@Icons.Material.Filled.Person"
+              Description="The people in your world. Relate notes, events and actions to them."
+              EmptyText="No people yet. Capture a node and promote it to a Person."
+              Filter="_filter" />
+
+@code {
+    private readonly NodeFilter _filter = new() { Kind = NodeKind.Person };
+}

@@ -1,0 +1,59 @@
+@* Reusable list of nodes with a search box; used by All, Notes, People, Projects, etc. *@
+@inject INodeService NodeService
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icon" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4" Class="flex-grow-1">@Title</MudText>
+    @if (ShowSearch)
+    {
+        <MudTextField @bind-Value="_search" Placeholder="Search…" Immediate="true"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" OnDebounceIntervalElapsed="Reload"
+                      DebounceInterval="300" Style="max-width:280px;" />
+    }
+</div>
+
+@if (Description is not null)
+{
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">@Description</MudText>
+}
+
+@if (_nodes is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_nodes.Count == 0)
+{
+    <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true">
+        <MudIcon Icon="@Icon" Size="Size.Large" Class="mud-text-secondary mb-2" />
+        <MudText Typo="Typo.body1" Class="mud-text-secondary">@EmptyText</MudText>
+    </MudPaper>
+}
+else
+{
+    @foreach (var node in _nodes)
+    {
+        <NodeCard Node="node" ShowDate="ShowDates" OnChanged="Reload" />
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.ViewList;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "Nothing here yet.";
+    [Parameter, EditorRequired] public NodeFilter Filter { get; set; } = new();
+    [Parameter] public bool ShowSearch { get; set; } = true;
+    [Parameter] public bool ShowDates { get; set; }
+
+    private List<Node>? _nodes;
+    private string? _search;
+
+    protected override async Task OnParametersSetAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        Filter.SearchText = string.IsNullOrWhiteSpace(_search) ? null : _search;
+        _nodes = await NodeService.QueryAsync(Filter);
+    }
+}

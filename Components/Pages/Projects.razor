@@ -1,0 +1,11 @@
+@page "/projects"
+<PageTitle>Projects · Nook</PageTitle>
+
+<NodeListView Title="Projects" Icon="@Icons.Material.Filled.Folder"
+              Description="Things you're working on. Connect materials, notes and actions."
+              EmptyText="No projects yet. Capture a node and promote it to a Project."
+              Filter="_filter" />
+
+@code {
+    private readonly NodeFilter _filter = new() { Kind = NodeKind.Project };
+}

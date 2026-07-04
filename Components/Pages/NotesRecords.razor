@@ -1,0 +1,11 @@
+@page "/notes"
+<PageTitle>Notes &amp; Records · Nook</PageTitle>
+
+<NodeListView Title="Notes &amp; Records" Icon="@Icons.Material.Filled.Notes"
+              Description="Notes, ideas, references, bookmarks, journals, observations and lists."
+              EmptyText="No records yet."
+              Filter="_filter" />
+
+@code {
+    private readonly NodeFilter _filter = new() { KindsIn = NodeFilter.RecordKinds };
+}

@@ -1,0 +1,135 @@
+@* Structured event details for a node of Kind = Event. *@
+@inject IEventService EventService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <div class="d-flex align-center mb-2">
+        <MudText Typo="Typo.h6">Event details</MudText>
+        <MudSpacer />
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Edit"
+                   OnClick="@(() => _editing = !_editing)">@(_editing ? "Done" : "Edit")</MudButton>
+    </div>
+
+    @if (_details is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!_editing)
+    {
+        <MudField Label="Occurred" Variant="Variant.Text">@_details.OccurredAt.ToLocalTime().ToString("g")</MudField>
+        <MudField Label="Verb" Variant="Variant.Text">@(_details.Verb?.Name ?? "—")</MudField>
+        <MudField Label="Subject" Variant="Variant.Text">@NodeLink(_details.SubjectNode)</MudField>
+        <MudField Label="Object" Variant="Variant.Text">@NodeLink(_details.ObjectNode)</MudField>
+        <MudField Label="Place" Variant="Variant.Text">@NodeLink(_details.PlaceNode)</MudField>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-3">Participants</MudText>
+        @if (_details.Participants.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">None.</MudText>
+        }
+        else
+        {
+            @foreach (var p in _details.Participants)
+            {
+                <div class="d-flex align-center gap-2 py-1">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@p.Role</MudChip>
+                    <MudLink Href="@($"/nodes/{p.ParticipantNodeId}")">@p.ParticipantNode?.Title</MudLink>
+                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close"
+                                   OnClick="@(() => RemoveParticipant(p.ParticipantNodeId, p.Role))" />
+                </div>
+            }
+        }
+
+        <div class="d-flex gap-2 align-end mt-2 flex-wrap">
+            <div style="min-width:220px;">
+                <NodeAutocomplete Label="Add participant…" Value="_participant" ValueChanged="@(n => { _participant = n; return Task.CompletedTask; })"
+                                  ExcludeIds="@(new[] { EventNodeId })" />
+            </div>
+            <MudSelect T="EventParticipantRole" @bind-Value="_participantRole" Label="Role" Dense="true" Style="min-width:140px;">
+                @foreach (var r in Enum.GetValues<EventParticipantRole>())
+                {
+                    <MudSelectItem T="EventParticipantRole" Value="r">@r</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton OnClick="AddParticipant" Disabled="@(_participant is null)">Add</MudButton>
+        </div>
+    }
+    else
+    {
+        <MudDatePicker @bind-Date="_occurred" Label="Occurred" Class="mb-2" />
+        <MudSelect T="int?" @bind-Value="_verbId" Label="Verb" Dense="true" Clearable="true" Class="mb-2">
+            @foreach (var v in _verbs)
+            {
+                <MudSelectItem T="int?" Value="@((int?)v.VerbId)">@v.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <NodeAutocomplete Label="Subject" Value="_subject" ValueChanged="@(n => { _subject = n; return Task.CompletedTask; })" Class="mb-2" />
+        <NodeAutocomplete Label="Object" Value="_object" ValueChanged="@(n => { _object = n; return Task.CompletedTask; })" Class="mb-2" />
+        <NodeAutocomplete Label="Place" Value="_place" ValueChanged="@(n => { _place = n; return Task.CompletedTask; })" OnlyKind="NodeKind.Place" Class="mb-2" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">Save event details</MudButton>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public int EventNodeId { get; set; }
+    [Parameter] public string EventTitle { get; set; } = "";
+    [Parameter] public string? EventBody { get; set; }
+
+    private EventDetails? _details;
+    private List<Verb> _verbs = new();
+    private bool _editing;
+
+    private DateTime? _occurred;
+    private int? _verbId;
+    private Node? _subject;
+    private Node? _object;
+    private Node? _place;
+    private Node? _participant;
+    private EventParticipantRole _participantRole = EventParticipantRole.Participant;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _verbs = await EventService.GetVerbsAsync();
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _details = await EventService.GetByNodeIdAsync(EventNodeId);
+        if (_details is not null)
+        {
+            _occurred = _details.OccurredAt.ToLocalTime();
+            _verbId = _details.VerbId;
+            _subject = _details.SubjectNode;
+            _object = _details.ObjectNode;
+            _place = _details.PlaceNode;
+        }
+    }
+
+    private async Task Save()
+    {
+        await EventService.UpdateAsync(EventNodeId, EventTitle, (_occurred ?? DateTime.Now).ToUniversalTime(),
+            EventBody, _verbId, _subject?.NodeId, _object?.NodeId, _place?.NodeId);
+        Snackbar.Add("Event details saved", Severity.Success);
+        _editing = false;
+        await Reload();
+    }
+
+    private async Task AddParticipant()
+    {
+        if (_participant is null) return;
+        await EventService.AddParticipantAsync(EventNodeId, _participant.NodeId, _participantRole);
+        _participant = null;
+        await Reload();
+    }
+
+    private async Task RemoveParticipant(int nodeId, EventParticipantRole role)
+    {
+        await EventService.RemoveParticipantAsync(EventNodeId, nodeId, role);
+        await Reload();
+    }
+
+    private RenderFragment NodeLink(Node? node) => node is null
+        ? @<text>—</text>
+        : @<MudLink Href="@($"/nodes/{node.NodeId}")">@node.Title</MudLink>;
+}

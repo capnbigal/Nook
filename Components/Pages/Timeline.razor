@@ -1,62 +1,80 @@
 @page "/timeline"
-@inject ITimelineService TimelineService
+@inject IActivityService ActivityService
+@inject IEventService EventService
 @inject ICurrentUser CurrentUser
 
 <PageTitle>Timeline · Nook</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Timeline</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+    A chronological feed of changes across your graph. Life events you log appear on the
+    <MudLink Href="/events">Events</MudLink> page.
+</MudText>
 
-@if (_entries is null)
+@if (_rows is null)
 {
     <MudProgressCircular Indeterminate="true" />
 }
-else if (_entries.Count == 0)
+else if (_rows.Count == 0)
 {
-    <MudAlert Severity="Severity.Info">Your timeline is empty. Start capturing items!</MudAlert>
+    <MudAlert Severity="Severity.Info">Nothing yet. Start capturing.</MudAlert>
 }
 else
 {
-    <MudTimeline TimelinePosition="TimelinePosition.Start">
-        @foreach (var entry in _entries)
+    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+        Showing the most recent @_rows.Count change(s)@(_hasMore ? " — load more below" : "").
+    </MudText>
+    <MudTimeline TimelinePosition="TimelinePosition.Start" Class="mt-2">
+        @foreach (var day in _rows.GroupBy(r => DateOnly.FromDateTime(r.Timestamp.ToLocalTime())).OrderByDescending(g => g.Key))
         {
-            @if (entry is ShoutoutEntry shoutout)
-            {
-                <MudTimelineItem Color="Color.Secondary" Icon="@IconFor(shoutout.Icon)">
-                    <MudPaper Class="pa-3" Elevation="2">
-                        <MudText Typo="Typo.subtitle1">@shoutout.Text</MudText>
-                    </MudPaper>
-                </MudTimelineItem>
-            }
-            else if (entry is DayEntry day)
-            {
-                <MudTimelineItem Color="Color.Primary" Icon="@Icons.Material.Filled.Event">
-                    <MudText Typo="Typo.subtitle2">@day.Date.ToString("dddd, MMM d")</MudText>
-                    @foreach (var ev in day.Events)
-                    {
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                            @ev.Type — @ev.ItemTitle
-                        </MudText>
-                    }
-                </MudTimelineItem>
-            }
+            <MudTimelineItem Color="Color.Primary" Icon="@Icons.Material.Filled.Event">
+                <MudText Typo="Typo.subtitle2">@day.Key.ToString("dddd, MMM d")</MudText>
+                @foreach (var ev in day.OrderByDescending(e => e.Timestamp))
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                        @ev.Type —
+                        @if (ev.NodeId is int nid)
+                        {
+                            <MudLink Href="@($"/nodes/{nid}")">@ev.ItemTitle</MudLink>
+                        }
+                        else
+                        {
+                            @ev.ItemTitle
+                        }
+                        @(ev.Detail is null ? "" : $" ({ev.Detail})")
+                    </MudText>
+                }
+            </MudTimelineItem>
         }
     </MudTimeline>
+
+    @if (_hasMore)
+    {
+        <div class="d-flex justify-center mt-3">
+            <MudButton Variant="Variant.Outlined" OnClick="LoadMore">Load more</MudButton>
+        </div>
+    }
 }
 
 @code {
-    private List<TimelineEntry>? _entries;
+    private List<ActivityLog>? _rows;
+    private int _limit = 100;
+    private bool _hasMore;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
         var userId = await CurrentUser.GetRequiredUserIdAsync();
-        _entries = await TimelineService.BuildAsync(userId);
+        // Ask for one extra to know whether more history exists (no silent cap).
+        var rows = await ActivityService.GetForUserAsync(userId, take: _limit + 1);
+        _hasMore = rows.Count > _limit;
+        _rows = rows.Take(_limit).ToList();
     }
 
-    private static string IconFor(string name) => name switch
+    private async Task LoadMore()
     {
-        "Celebration" => Icons.Material.Filled.Celebration,
-        "NoteAdd" => Icons.Material.Filled.NoteAdd,
-        "TrendingUp" => Icons.Material.Filled.TrendingUp,
-        _ => Icons.Material.Filled.Star
-    };
+        _limit += 100;
+        await LoadAsync();
+    }
 }

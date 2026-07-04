@@ -1,0 +1,182 @@
+@* Actions attached to a node: create, complete, checklist. *@
+@inject IActionService ActionService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <div class="d-flex align-center mb-2">
+        <MudText Typo="Typo.h6">Actions</MudText>
+        <MudSpacer />
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                   Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="@(() => _creating = !_creating)">Create Action</MudButton>
+    </div>
+
+    @if (_creating)
+    {
+        <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+            <div class="d-flex gap-2 flex-wrap align-end">
+                <MudSelect T="ActionKind" @bind-Value="_newKind" Label="Kind" Dense="true" Style="min-width:140px;">
+                    @foreach (var k in new[] { ActionKind.Task, ActionKind.Reminder })
+                    {
+                        <MudSelectItem T="ActionKind" Value="k">@k</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_newTitle" Label="Title" Immediate="true" Style="min-width:200px;" />
+                <MudSelect T="ActionVerb" @bind-Value="_newVerb" Label="Verb" Dense="true" Style="min-width:130px;">
+                    @foreach (var v in Enum.GetValues<ActionVerb>())
+                    {
+                        <MudSelectItem T="ActionVerb" Value="v">@v</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="ActionPriority?" @bind-Value="_newPriority" Label="Priority" Dense="true"
+                           Clearable="true" Style="min-width:130px;">
+                    @foreach (var p in Enum.GetValues<ActionPriority>())
+                    {
+                        <MudSelectItem T="ActionPriority?" Value="@((ActionPriority?)p)">@p</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudDatePicker @bind-Date="_newDue" Label="Due" Style="min-width:150px;" />
+                <MudDatePicker @bind-Date="_newRemind" Label="Remind" Style="min-width:150px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAction"
+                           Disabled="@string.IsNullOrWhiteSpace(_newTitle)">Add</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _creating = false)">Cancel</MudButton>
+            </div>
+        </MudPaper>
+    }
+
+    @if (_actions is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_actions.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No actions yet.</MudText>
+    }
+    else
+    {
+        @foreach (var a in _actions.Where(x => x.ParentActionId == null))
+        {
+            @RenderAction(a)
+            @foreach (var child in _actions.Where(c => c.ParentActionId == a.ActionItemId))
+            {
+                <div style="margin-left:2rem;">@RenderAction(child)</div>
+            }
+            @if (_addingChecklistFor == a.ActionItemId)
+            {
+                <div style="margin-left:2rem;" class="d-flex gap-2 align-center mb-2">
+                    <MudTextField @bind-Value="_checklistText" Label="Checklist item" Immediate="true"
+                                  Style="min-width:220px;" />
+                    <MudButton Size="Size.Small" OnClick="@(() => AddChecklistItem(a.ActionItemId))"
+                               Disabled="@string.IsNullOrWhiteSpace(_checklistText)">Add</MudButton>
+                </div>
+            }
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public int NodeId { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private List<ActionItem>? _actions;
+    private bool _creating;
+    private ActionKind _newKind = ActionKind.Task;
+    private string? _newTitle;
+    private ActionVerb _newVerb = ActionVerb.None;
+    private ActionPriority? _newPriority;
+    private DateTime? _newDue;
+    private DateTime? _newRemind;
+    private int? _addingChecklistFor;
+    private string? _checklistText;
+
+    protected override async Task OnParametersSetAsync() => await Reload();
+
+    /// <summary>Opens the inline "create action" form (used by the detail page's Add-new column).</summary>
+    public void OpenCreate()
+    {
+        _creating = true;
+        StateHasChanged();
+    }
+
+    private async Task Reload() => _actions = await ActionService.GetForNodeAsync(NodeId);
+
+    private async Task CreateAction()
+    {
+        if (string.IsNullOrWhiteSpace(_newTitle)) return;
+        await ActionService.CreateAsync(new ActionItem
+        {
+            Kind = _newKind,
+            Title = _newTitle.Trim(),
+            Verb = _newVerb,
+            Priority = _newPriority,
+            DueDate = _newDue?.ToUniversalTime(),
+            RemindAt = _newRemind?.ToUniversalTime(),
+            TargetNodeId = NodeId,
+        });
+        Snackbar.Add("Action created", Severity.Success);
+        _newTitle = null; _newVerb = ActionVerb.None; _newPriority = null; _newDue = null; _newRemind = null;
+        _creating = false;
+        await Reload();
+        await Notify();
+    }
+
+    private async Task Toggle(ActionItem a)
+    {
+        if (a.Status == ActionStatus.Done) await ActionService.ReopenAsync(a.ActionItemId);
+        else await ActionService.CompleteAsync(a.ActionItemId);
+        await Reload();
+        await Notify();
+    }
+
+    private async Task Cancel(int id) { await ActionService.CancelAsync(id); await Reload(); await Notify(); }
+    private async Task Delete(int id) { await ActionService.DeleteAsync(id); await Reload(); await Notify(); }
+
+    private async Task AddChecklistItem(int parentId)
+    {
+        if (string.IsNullOrWhiteSpace(_checklistText)) return;
+        await ActionService.AddChecklistItemAsync(parentId, _checklistText.Trim());
+        _checklistText = null; _addingChecklistFor = null;
+        await Reload();
+    }
+
+    private Task Notify() => OnChanged.HasDelegate ? OnChanged.InvokeAsync() : Task.CompletedTask;
+
+    private RenderFragment RenderAction(ActionItem a) =>@<div class="d-flex align-center gap-2 py-1">
+        <MudCheckBox T="bool" Value="@(a.Status == ActionStatus.Done)"
+                     ValueChanged="@(_ => Toggle(a))" Dense="true" />
+        <MudIcon Icon="@NodeUi.ActionIcon(a.Kind)" Size="Size.Small" />
+        <MudText Typo="Typo.body2"
+                 Style="@(a.Status == ActionStatus.Done ? "text-decoration:line-through;opacity:.6;" : "")">
+            @a.Title
+        </MudText>
+        @if (a.Verb != ActionVerb.None)
+        {
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@a.Verb</MudChip>
+        }
+        @if (a.Priority is not null)
+        {
+            <MudChip T="string" Size="Size.Small" Style="@($"color:{NodeUi.PriorityColorHex(a.Priority)};")"
+                     Variant="Variant.Outlined">@a.Priority</MudChip>
+        }
+        @if (a.DueDate is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">due @a.DueDate.Value.ToLocalTime().ToString("d")</MudText>
+        }
+        @if (a.RemindAt is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                <MudIcon Icon="@Icons.Material.Filled.Alarm" Size="Size.Small" /> @a.RemindAt.Value.ToLocalTime().ToString("d")
+            </MudText>
+        }
+        <MudSpacer />
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+            @if (a.ParentActionId == null)
+            {
+                <MudMenuItem Icon="@Icons.Material.Filled.Checklist"
+                             OnClick="@(() => _addingChecklistFor = a.ActionItemId)">Add checklist item</MudMenuItem>
+            }
+            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => Cancel(a.ActionItemId))">Cancel</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => Delete(a.ActionItemId))">Delete</MudMenuItem>
+        </MudMenu>
+    </div>;
+}

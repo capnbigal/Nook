@@ -1,0 +1,11 @@
+@page "/unassigned"
+<PageTitle>Unassigned · Nook</PageTitle>
+
+<NodeListView Title="Unassigned" Icon="@Icons.Material.Filled.HelpOutline"
+              Description="Nodes that may need attention: unclassified, still in the inbox, or not in any collection. They remain fully visible everywhere else."
+              EmptyText="Nothing unassigned — everything has a kind, a home, or has left the inbox."
+              Filter="_filter" ShowDates="true" />
+
+@code {
+    private readonly NodeFilter _filter = new() { UnassignedOnly = true };
+}

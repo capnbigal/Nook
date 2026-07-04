@@ -1,0 +1,69 @@
+@* Inline "create a collection" dialog. Returns a CollectionDraft; the caller
+   decides whether to persist immediately or queue it for a draft node. *@
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.CreateNewFolder" />
+            <MudText Typo="Typo.h6">Create collection</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_title" Label="Name" Required="true" Immediate="true"
+                      MaxLength="300" AutoFocus="true" Class="mb-2"
+                      Error="@(_error is not null)" ErrorText="@_error" />
+
+        <MudSelect T="CollectionKind" @bind-Value="_kind" Label="Type" Dense="true" Class="mb-2">
+            @foreach (var k in Enum.GetValues<CollectionKind>())
+            {
+                <MudSelectItem T="CollectionKind" Value="k">@k — @KindHint(k)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField @bind-Value="_body" Label="Description (optional)" Lines="2" />
+
+        <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2">
+            Queues and lists keep their order; folders and plain collections don't.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit"
+                   Disabled="@string.IsNullOrWhiteSpace(_title)">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Existing active collection names, for client-side duplicate detection.</summary>
+    [Parameter] public IReadOnlyCollection<string> ExistingNames { get; set; } = Array.Empty<string>();
+
+    private string _title = "";
+    private CollectionKind _kind = CollectionKind.Queue;
+    private string? _body;
+    private string? _error;
+
+    private void Submit()
+    {
+        var name = _title.Trim();
+        if (string.IsNullOrWhiteSpace(name)) { _error = "A name is required."; return; }
+        if (ExistingNames.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            _error = $"A collection named \"{name}\" already exists.";
+            return;
+        }
+        MudDialog.Close(DialogResult.Ok(new CollectionDraft(name, _kind, string.IsNullOrWhiteSpace(_body) ? null : _body)));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string KindHint(CollectionKind k) => k switch
+    {
+        CollectionKind.Folder => "grouping",
+        CollectionKind.List => "ordered items",
+        CollectionKind.Queue => "ordered, for working through",
+        CollectionKind.Plain => "simple set",
+        _ => "",
+    };
+}

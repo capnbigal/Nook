@@ -1,0 +1,42 @@
+@* Search and pick one of the current user's nodes. *@
+@inject INodeService NodeService
+
+<MudAutocomplete T="Node" Label="@Label" SearchFunc="Search" Value="Value" ValueChanged="OnChanged"
+                 ToStringFunc="@(n => n is null ? string.Empty : n.Title)"
+                 ResetValueOnEmptyText="true" Clearable="true" Dense="true"
+                 AdornmentIcon="@Icons.Material.Filled.Search" Class="@Class">
+    <ItemTemplate Context="node">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@NodeUi.Icon(node.Kind)" Size="Size.Small" />
+            <span>@node.Title</span>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@node.Kind</MudChip>
+        </div>
+    </ItemTemplate>
+</MudAutocomplete>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Find a node…";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public Node? Value { get; set; }
+    [Parameter] public EventCallback<Node?> ValueChanged { get; set; }
+
+    /// <summary>Optional node ids to exclude from results (e.g. the current node).</summary>
+    [Parameter] public IEnumerable<int>? ExcludeIds { get; set; }
+
+    /// <summary>Optional restriction to a single kind (e.g. Place for an event location).</summary>
+    [Parameter] public NodeKind? OnlyKind { get; set; }
+
+    private async Task<IEnumerable<Node>> Search(string value, CancellationToken token)
+    {
+        var results = await NodeService.QueryAsync(new NodeFilter { SearchText = value, Kind = OnlyKind });
+        IEnumerable<Node> filtered = results;
+        if (ExcludeIds is not null)
+        {
+            var exclude = ExcludeIds.ToHashSet();
+            filtered = filtered.Where(n => !exclude.Contains(n.NodeId));
+        }
+        return filtered.Take(12);
+    }
+
+    private Task OnChanged(Node? node) => ValueChanged.InvokeAsync(node);
+}

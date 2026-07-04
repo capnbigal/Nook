@@ -28,6 +28,31 @@ public sealed class ActivityService : IActivityService
         await db.SaveChangesAsync();
     }
 
+    public async Task LogNodeAsync(string userId, ActivityType type, int? nodeId, string title, string? detail = null)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        db.ActivityLogs.Add(new ActivityLog
+        {
+            UserId = userId,
+            Type = type,
+            NodeId = nodeId,
+            ItemTitle = title.Length > 300 ? title[..300] : title,
+            Detail = detail,
+            Timestamp = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+    }
+
+    public async Task<List<ActivityLog>> GetForNodeAsync(string userId, int nodeId, int? take = null)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        IQueryable<ActivityLog> query = db.ActivityLogs
+            .Where(a => a.UserId == userId && a.NodeId == nodeId)
+            .OrderByDescending(a => a.Timestamp).ThenByDescending(a => a.ActivityLogId);
+        if (take.HasValue) query = query.Take(take.Value);
+        return await query.ToListAsync();
+    }
+
     public async Task<List<ActivityLog>> GetForUserAsync(
         string userId, ActivityType? type = null, DateTime? from = null, DateTime? to = null, int? take = null)
     {

@@ -40,9 +40,9 @@
                                  Style="@(string.IsNullOrWhiteSpace(tag.Color) ? "" : $"border-color:{tag.Color};color:{tag.Color};")">
                             @tag.Name
                         </MudChip>
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary flex-grow-1">@tag.ItemCount item(s)</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary flex-grow-1">@tag.ItemCount node(s)</MudText>
                         <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterList"
-                                   OnClick="@(() => Nav.NavigateTo($"/items?tagId={tag.TagId}"))">View items</MudButton>
+                                   OnClick="@(() => Nav.NavigateTo($"/tags/{tag.TagId}"))">View nodes</MudButton>
                         <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Delete"
                                        OnClick="@(() => DeleteAsync(tag))" title="Delete tag" />
                     </div>
@@ -88,7 +88,7 @@
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Delete tag?",
-            $"\"{tag.Name}\" will be removed from {tag.ItemCount} item(s). The items themselves are not deleted.",
+            $"\"{tag.Name}\" will be removed from {tag.ItemCount} node(s). The nodes themselves are not deleted.",
             yesText: "Delete", cancelText: "Cancel");
         if (confirmed == true)
         {

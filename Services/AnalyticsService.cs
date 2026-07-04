@@ -17,65 +17,64 @@ public sealed class AnalyticsService : IAnalyticsService
     {
         await using var db = await _factory.CreateDbContextAsync();
 
-        var items = await db.Items
-            .Where(i => i.UserId == userId)
-            .Select(i => new
-            {
-                i.ItemType, i.Status, i.Priority, i.DueDate, i.CreatedAt, i.CompletedDate,
-                TagCount = i.ItemTags.Count
-            })
+        var nodes = await db.Nodes
+            .Where(n => n.UserId == userId)
+            .Select(n => new { n.Kind, n.CreatedAt, TagCount = n.NodeTags.Count })
             .ToListAsync();
 
-        var total = items.Count;
-        var completed = items.Count(i => i.Status == ItemStatus.Done);
-        var open = items.Count(i => i.Status != ItemStatus.Done);
+        var actions = await db.ActionItems
+            .Where(a => a.UserId == userId)
+            .Select(a => new { a.Status, a.Priority, a.DueDate, a.CompletedAt })
+            .ToListAsync();
+
         var now = DateTime.UtcNow;
-        var overdue = items.Count(i => i.Status != ItemStatus.Done && i.DueDate != null && i.DueDate < now);
-        var untagged = items.Count(i => i.TagCount == 0);
-        var completionRate = total == 0 ? 0 : Math.Round(completed * 100.0 / total, 1);
+        int totalNodes = nodes.Count;
+        int completed = actions.Count(a => a.Status == ActionStatus.Done);
+        int open = actions.Count(a => a.Status is ActionStatus.Open or ActionStatus.InProgress);
+        int overdue = actions.Count(a => a.Status != ActionStatus.Done && a.Status != ActionStatus.Cancelled
+                                          && a.DueDate != null && a.DueDate < now);
+        int untagged = nodes.Count(n => n.TagCount == 0);
+        int totalActions = actions.Count;
+        double completionRate = totalActions == 0 ? 0 : Math.Round(completed * 100.0 / totalActions, 1);
 
-        var byType = items.GroupBy(i => i.ItemType)
+        var byType = nodes.GroupBy(n => n.Kind)
             .Select(g => new CountSlice(g.Key.ToString(), g.Count()))
             .OrderByDescending(s => s.Count).ToList();
-        var byStatus = items.GroupBy(i => i.Status)
+        var byStatus = actions.GroupBy(a => a.Status)
             .Select(g => new CountSlice(g.Key.ToString(), g.Count()))
             .OrderByDescending(s => s.Count).ToList();
-        var byPriority = items.Where(i => i.Priority != null)
-            .GroupBy(i => i.Priority!.Value)
+        var byPriority = actions.Where(a => a.Priority != null)
+            .GroupBy(a => a.Priority!.Value)
             .Select(g => new CountSlice(g.Key.ToString(), g.Count()))
             .OrderByDescending(s => s.Count).ToList();
 
-        // Tag insights.
-        // Count only links to items the user owns, so the figure can't be inflated
-        // by a stray cross-user ItemTag even though tags are per-user today.
         var topTags = await db.Tags
             .Where(t => t.UserId == userId)
-            .OrderByDescending(t => t.ItemTags.Count(it => it.Item.UserId == userId))
+            .OrderByDescending(t => t.NodeTags.Count(nt => nt.Node.UserId == userId))
             .ThenBy(t => t.Name)
             .Take(10)
-            .Select(t => new CountSlice(t.Name, t.ItemTags.Count(it => it.Item.UserId == userId)))
+            .Select(t => new CountSlice(t.Name, t.NodeTags.Count(nt => nt.Node.UserId == userId)))
             .ToListAsync();
 
-        // Busiest day-of-week by item creation.
-        DayOfWeek? busiest = items.Count == 0 ? null :
-            items.GroupBy(i => i.CreatedAt.DayOfWeek)
+        DayOfWeek? busiest = nodes.Count == 0 ? null :
+            nodes.GroupBy(n => n.CreatedAt.DayOfWeek)
                  .OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
                  .First().Key;
 
-        // Weekly trend over the last 8 ISO weeks.
         var weekly = BuildWeeklyTrend(
-            items.Select(i => (i.CreatedAt, i.CompletedDate)).ToList(), now, weeks: 8);
+            nodes.Select(n => n.CreatedAt).ToList(),
+            actions.Where(a => a.CompletedAt != null).Select(a => a.CompletedAt!.Value).ToList(),
+            now, weeks: 8);
 
         return new AnalyticsModel(
-            total, open, completed, completionRate, overdue, untagged, busiest,
+            totalNodes, open, completed, completionRate, overdue, untagged, busiest,
             byType, byStatus, byPriority, topTags, weekly);
     }
 
     private static List<WeekPoint> BuildWeeklyTrend(
-        List<(DateTime Created, DateTime? Completed)> items, DateTime now, int weeks)
+        List<DateTime> created, List<DateTime> completed, DateTime now, int weeks)
     {
         var points = new List<WeekPoint>();
-        // Monday of the current week.
         var today = DateOnly.FromDateTime(now);
         int offset = ((int)today.DayOfWeek + 6) % 7; // Monday=0
         var currentMonday = today.AddDays(-offset);
@@ -84,15 +83,9 @@ public sealed class AnalyticsService : IAnalyticsService
         {
             var start = currentMonday.AddDays(-7 * w);
             var end = start.AddDays(7);
-            var created = items.Count(i =>
-            {
-                var d = DateOnly.FromDateTime(i.Created);
-                return d >= start && d < end;
-            });
-            var completed = items.Count(i =>
-                i.Completed is DateTime c &&
-                DateOnly.FromDateTime(c) >= start && DateOnly.FromDateTime(c) < end);
-            points.Add(new WeekPoint(start, created, completed));
+            int c = created.Count(d => { var o = DateOnly.FromDateTime(d); return o >= start && o < end; });
+            int done = completed.Count(d => { var o = DateOnly.FromDateTime(d); return o >= start && o < end; });
+            points.Add(new WeekPoint(start, c, done));
         }
         return points;
     }

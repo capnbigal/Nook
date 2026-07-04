@@ -1,0 +1,11 @@
+@page "/inbox"
+<PageTitle>Inbox · Nook</PageTitle>
+
+<NodeListView Title="Inbox" Icon="@Icons.Material.Filled.Inbox"
+              Description="Captured but not yet organised. Promote a kind, tag, relate, or add to a collection when ready."
+              EmptyText="Inbox zero. Nothing waiting to be organised."
+              Filter="_filter" ShowDates="true" />
+
+@code {
+    private readonly NodeFilter _filter = new() { State = NodeState.Inbox };
+}

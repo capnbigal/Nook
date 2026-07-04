@@ -1,0 +1,429 @@
+@page "/nodes/{Id:int}"
+@inject INodeService NodeService
+@inject ITagService TagService
+@inject ICollectionService CollectionService
+@inject IActivityService ActivityService
+@inject IRelationService RelationService
+@inject IActionService ActionService
+@inject IEventService EventService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_node?.Title ?? "Node") · Nook</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_node is null)
+{
+    <MudAlert Severity="Severity.Error">Node not found.</MudAlert>
+    <MudButton Class="mt-3" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/all">Back to all</MudButton>
+}
+else
+{
+    @* ---- Compact header ---- *@
+    <div class="d-flex align-center mb-4 gap-2 flex-wrap">
+        <MudIcon Icon="@NodeUi.Icon(_node.Kind)" Color="Color.Primary" Size="Size.Large" />
+        <MudText Typo="Typo.h4" Class="flex-grow-1">@_node.Title</MudText>
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@_node.Kind</MudChip>
+        <MudChip T="string" Size="Size.Small" Color="@NodeUi.StateColor(_node.State)" Variant="Variant.Outlined">@_node.State</MudChip>
+    </div>
+
+    @if (_editing)
+    {
+        <MudPaper Class="pa-6 mb-4" Elevation="1">
+            <NodeEditor Node="_editModel" AllTags="_allTags" SelectedTagIds="_selectedTagIds"
+                        SubmitLabel="Save changes" OnValidSubmit="SaveEdit" OnCancel="CancelEdit" />
+        </MudPaper>
+    }
+    else
+    {
+        @* ================= ROW 1: Details | Information ================= *@
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4 h-100" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Details</MudText>
+                    @if (!string.IsNullOrWhiteSpace(_node.Body))
+                    {
+                        <MudText Typo="Typo.body1" Style="white-space:pre-wrap;">@_node.Body</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No content.</MudText>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_node.Url))
+                    {
+                        <MudLink Href="@_node.Url" Target="_blank" Class="d-flex align-center gap-1 mt-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" /> @_node.Url
+                        </MudLink>
+                    }
+                    @if (_node.Tags.Any())
+                    {
+                        <TagChips Tags="_node.Tags" Class="mt-3" />
+                    }
+
+                    <MudDivider Class="my-3" />
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                                   OnClick="@(() => _promoting = !_promoting)">Change kind</MudButton>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">State: @_node.State</MudText>
+                    </div>
+                    @if (_promoting)
+                    {
+                        <div class="d-flex align-center gap-2 flex-wrap mt-2">
+                            @foreach (var kind in NodeUi.AssignableKinds)
+                            {
+                                <MudButton Size="Size.Small" Variant="@(kind == _node.Kind ? Variant.Filled : Variant.Outlined)"
+                                           StartIcon="@NodeUi.Icon(kind)" OnClick="@(() => Promote(kind))">@kind</MudButton>
+                            }
+                        </div>
+                    }
+
+                    <MudDivider Class="my-3" />
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudButton StartIcon="@Icons.Material.Filled.Edit" Variant="Variant.Filled" Color="Color.Primary"
+                                   OnClick="StartEdit">Edit</MudButton>
+                        <MudIconButton Icon="@(_node.IsPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                                       Color="@(_node.IsPinned ? Color.Primary : Color.Default)" OnClick="TogglePin" title="Pin" />
+                        <MudIconButton Icon="@(_node.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                                       Color="@(_node.IsFavorite ? Color.Warning : Color.Default)" OnClick="ToggleFavorite" title="Favorite" />
+                        @if (_node.State != NodeState.Archived)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Archive" OnClick="Archive" title="Archive" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Unarchive" OnClick="Restore" title="Restore" />
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="Delete" title="Delete" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4 h-100" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Information</MudText>
+                    <MudField Label="Kind / State" Variant="Variant.Text">@_node.Kind · @_node.State</MudField>
+                    <MudField Label="Created" Variant="Variant.Text">@NodeUi.Format(_node.CreatedAt)</MudField>
+                    <MudField Label="Updated" Variant="Variant.Text">@NodeUi.Format(_node.UpdatedAt)</MudField>
+                    <div class="d-flex gap-2 flex-wrap mt-2 mb-3">
+                        @if (_node.IsPinned)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.PushPin">Pinned</MudChip>
+                        }
+                        @if (_node.IsFavorite)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Star">Favorite</MudChip>
+                        }
+                        @if (_node.State == NodeState.Archived)
+                        {
+                            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Archive">Archived</MudChip>
+                        }
+                    </div>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">At a glance</MudText>
+                    <div class="d-flex gap-4 flex-wrap">
+                        @CountStat("Collections", _collectionsCount, Icons.Material.Filled.Collections)
+                        @CountStat("Connections", _connectionsCount, Icons.Material.Filled.Hub)
+                        @CountStat("Open actions", _openActionsCount, Icons.Material.Filled.CheckBox)
+                        @CountStat("Events", _eventsForNode.Count, Icons.Material.Filled.Event)
+                    </div>
+
+                    @if (_node.Kind == NodeKind.Collection && _node.Collection is not null)
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudField Label="Collection type" Variant="Variant.Text">@_node.Collection.Kind</MudField>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.OpenInNew"
+                                   Href="@($"/collections/{_node.NodeId}")">Open collection</MudButton>
+                    }
+                    else if (_node.Kind == NodeKind.Event && _node.EventDetails is not null)
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudField Label="Occurred" Variant="Variant.Text">@_node.EventDetails.OccurredAt.ToLocalTime().ToString("g")</MudField>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @* ================= ROW 2: Add new | Current ================= *@
+        <MudGrid Class="mt-1">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Add new</MudText>
+
+                    @* Collections are the priority in this row. *@
+                    <CollectionAssignmentPanel NodeId="_node.NodeId" OnChanged="RefreshCounts" />
+
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">More</MudText>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.AddTask"
+                                   Variant="Variant.Outlined" OnClick="@(() => _actionsPanel?.OpenCreate())">Create action</MudButton>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.AddLink"
+                                   Variant="Variant.Outlined" OnClick="@(() => _connectionsPanel?.OpenAdd())">Add relationship</MudButton>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Event"
+                                   Variant="Variant.Outlined" Href="/events">Log event</MudButton>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Label"
+                                   Variant="Variant.Outlined" OnClick="StartEdit">Edit tags</MudButton>
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.h6" Class="mb-2">Current</MudText>
+                <ConnectionsPanel @ref="_connectionsPanel" NodeId="_node.NodeId" OnChanged="RefreshCounts" />
+                <ActionsPanel @ref="_actionsPanel" NodeId="_node.NodeId" OnChanged="RefreshCounts" />
+
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Related by tags</MudText>
+                    @if (_related.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No related nodes.</MudText>
+                    }
+                    else
+                    {
+                        @foreach (var rel in _related)
+                        {
+                            <div class="py-1">
+                                <MudLink Href="@($"/nodes/{rel.NodeId}")">
+                                    <MudIcon Icon="@NodeUi.Icon(rel.Kind)" Size="Size.Small" /> @rel.Title
+                                </MudLink>
+                            </div>
+                        }
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @* ================= ROW 3: History | Context details ================= *@
+        <MudGrid Class="mt-1">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">History</MudText>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Activity</MudText>
+                    @if (_activity.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">No activity yet.</MudText>
+                    }
+                    else
+                    {
+                        @foreach (var log in _activity)
+                        {
+                            <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">
+                                @log.Timestamp.ToLocalTime().ToString("g") — @log.Type@(log.Detail is null ? "" : $" ({log.Detail})")
+                            </MudText>
+                        }
+                        @if (_activityHasMore)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="LoadMoreActivity"
+                                       Class="mt-1">Load more</MudButton>
+                        }
+                    }
+
+                    @if (_completedActions.Count > 0)
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-1">Completed actions</MudText>
+                        @foreach (var a in _completedActions)
+                        {
+                            <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> @a.Title
+                                @(a.CompletedAt is null ? "" : $"· {a.CompletedAt.Value.ToLocalTime():d}")
+                            </MudText>
+                        }
+                    }
+
+                    @if (_eventsForNode.Count > 0)
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-1">Events referencing this</MudText>
+                        @foreach (var ev in _eventsForNode)
+                        {
+                            <div class="py-1">
+                                <MudLink Href="@($"/nodes/{ev.NodeId}")">
+                                    <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" /> @ev.Title
+                                </MudLink>
+                                <MudText Typo="Typo.caption" Class="ml-1 mud-text-secondary">
+                                    @(ev.EventDetails?.OccurredAt.ToLocalTime().ToString("d"))
+                                </MudText>
+                            </div>
+                        }
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                @if (_node.Kind == NodeKind.Event)
+                {
+                    <EventPanel EventNodeId="_node.NodeId" EventTitle="@_node.Title" EventBody="@_node.Body" />
+                }
+
+                <MudPaper Class="pa-4 mb-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-2">Context details</MudText>
+                    @if (_connectionNotes.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-1">Relationship notes</MudText>
+                        @foreach (var c in _connectionNotes)
+                        {
+                            <MudText Typo="Typo.caption" Class="d-block mud-text-secondary">
+                                @c.Label <MudLink Href="@($"/nodes/{c.OtherNodeId}")">@c.OtherTitle</MudLink> — @c.Note
+                            </MudText>
+                        }
+                        <MudDivider Class="my-3" />
+                    }
+                    <MudField Label="Node id" Variant="Variant.Text">@_node.NodeId</MudField>
+                    @if (_node.Kind == NodeKind.Collection)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            This node is a collection; manage its members from
+                            <MudLink Href="@($"/collections/{_node.NodeId}")">its collection page</MudLink>.
+                        </MudText>
+                    }
+                    else if (_connectionNotes.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            No extra context yet. Add relationship notes, actions, or collections above.
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Node? _node;
+    private Node _editModel = new();
+    private List<Node> _related = new();
+    private List<ActivityLog> _activity = new();
+    private List<ActionItem> _completedActions = new();
+    private List<Node> _eventsForNode = new();
+    private List<Connection> _connectionNotes = new();
+    private List<Tag> _allTags = new();
+    private List<int> _selectedTagIds = new();
+
+    private int _collectionsCount;
+    private int _connectionsCount;
+    private int _openActionsCount;
+
+    private int _activityLimit = 10;
+    private bool _activityHasMore;
+
+    private bool _editing;
+    private bool _promoting;
+    private bool _loading = true;
+
+    private ActionsPanel? _actionsPanel;
+    private ConnectionsPanel? _connectionsPanel;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _editing = false;
+        _promoting = false;
+        _activityLimit = 10;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _node = await NodeService.GetByIdAsync(Id);
+        if (_node is not null)
+        {
+            _related = await NodeService.GetRelatedByTagsAsync(Id);
+            _eventsForNode = await EventService.GetEventsForNodeAsync(Id);
+            var allActions = await ActionService.GetForNodeAsync(Id);
+            _completedActions = allActions
+                .Where(a => a.Status is ActionStatus.Done or ActionStatus.Cancelled)
+                .OrderByDescending(a => a.CompletedAt).Take(20).ToList();
+            await RefreshCounts();
+            await LoadActivity();
+        }
+        _loading = false;
+    }
+
+    private async Task RefreshCounts()
+    {
+        if (_node is null) return;
+        _collectionsCount = (await CollectionService.GetCollectionSummariesForNodeAsync(Id)).Count;
+        var conns = await RelationService.GetConnectionsAsync(Id);
+        _connectionsCount = conns.Outgoing.Count + conns.Backlinks.Count;
+        _connectionNotes = conns.Outgoing.Concat(conns.Backlinks)
+            .Where(c => !string.IsNullOrWhiteSpace(c.Note)).ToList();
+        _openActionsCount = await ActionService.CountOpenForNodeAsync(Id);
+    }
+
+    private async Task LoadActivity()
+    {
+        var rows = await ActivityService.GetForNodeAsync(_node!.UserId, Id, _activityLimit + 1);
+        _activityHasMore = rows.Count > _activityLimit;
+        _activity = rows.Take(_activityLimit).ToList();
+    }
+
+    private async Task LoadMoreActivity()
+    {
+        _activityLimit += 10;
+        await LoadActivity();
+    }
+
+    private async Task StartEdit()
+    {
+        _allTags = await TagService.GetAllAsync();
+        _editModel = Clone(_node!);
+        _selectedTagIds = _node!.Tags.Select(t => t.TagId).ToList();
+        _editing = true;
+    }
+
+    private void CancelEdit() => _editing = false;
+
+    private async Task SaveEdit()
+    {
+        await NodeService.UpdateAsync(_editModel, _selectedTagIds);
+        Snackbar.Add("Saved", Severity.Success);
+        _editing = false;
+        await LoadAsync();
+    }
+
+    private async Task Promote(NodeKind kind)
+    {
+        await NodeService.PromoteAsync(Id, kind);
+        _promoting = false;
+        await LoadAsync();
+    }
+
+    private async Task TogglePin() { await NodeService.TogglePinAsync(Id); await LoadAsync(); }
+    private async Task ToggleFavorite() { await NodeService.ToggleFavoriteAsync(Id); await LoadAsync(); }
+    private async Task Archive() { await NodeService.ArchiveAsync(Id); Snackbar.Add("Archived", Severity.Info); await LoadAsync(); }
+    private async Task Restore() { await NodeService.RestoreAsync(Id); await LoadAsync(); }
+
+    private async Task Delete()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete node?",
+            "This permanently removes the node and its connections. Consider archiving instead.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            await NodeService.DeleteAsync(Id);
+            Snackbar.Add("Node deleted", Severity.Info);
+            Nav.NavigateTo("/all");
+        }
+    }
+
+    private RenderFragment CountStat(string label, int value, string icon) =>@<div class="d-flex align-center gap-1">
+        <MudIcon Icon="@icon" Size="Size.Small" Color="Color.Primary" />
+        <MudText Typo="Typo.body2"><b>@value</b> @label</MudText>
+    </div>;
+
+    private static Node Clone(Node s) => new()
+    {
+        NodeId = s.NodeId, UserId = s.UserId, Title = s.Title, Body = s.Body, Url = s.Url,
+        Kind = s.Kind, State = s.State, IsPinned = s.IsPinned, IsFavorite = s.IsFavorite,
+        ArchivedAt = s.ArchivedAt, CreatedAt = s.CreatedAt, UpdatedAt = s.UpdatedAt,
+    };
+}

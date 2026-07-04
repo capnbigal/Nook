@@ -1,0 +1,148 @@
+@page "/collections/{Id:int}"
+@inject ICollectionService CollectionService
+@inject INodeService NodeService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_collection?.Node?.Title ?? "Collection") · Nook</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_collection?.Node is null)
+{
+    <MudAlert Severity="Severity.Error">Collection not found.</MudAlert>
+    <MudButton Class="mt-3" Href="/collections" StartIcon="@Icons.Material.Filled.ArrowBack">Back to collections</MudButton>
+}
+else
+{
+    <div class="d-flex align-center mb-3 gap-2 flex-wrap">
+        <MudIcon Icon="@Icons.Material.Filled.Collections" Color="Color.Primary" Size="Size.Large" />
+        <MudText Typo="Typo.h4" Class="flex-grow-1">@_collection.Node.Title</MudText>
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@_collection.Kind</MudChip>
+        <MudIconButton Icon="@(_collection.Node.IsPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                       Color="@(_collection.Node.IsPinned ? Color.Primary : Color.Default)" OnClick="TogglePin" title="Pin" />
+        <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" Href="@($"/nodes/{Id}")">Open as node</MudButton>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_collection.Node.Body))
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">@_collection.Node.Body</MudText>
+    }
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-2">Members</MudText>
+                @if (_members.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Empty. Add nodes below.</MudText>
+                }
+                else
+                {
+                    @for (int i = 0; i < _members.Count; i++)
+                    {
+                        var m = _members[i];
+                        var idx = i;
+                        <div class="d-flex align-center gap-2 py-1">
+                            @if (_collection.IsOrdered)
+                            {
+                                <div class="d-flex flex-column">
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                                   Disabled="@(idx == 0)" OnClick="@(() => Move(m.NodeId, true))" />
+                                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                                   Disabled="@(idx == _members.Count - 1)" OnClick="@(() => Move(m.NodeId, false))" />
+                                </div>
+                            }
+                            <MudIcon Icon="@NodeUi.Icon(m.Kind)" Size="Size.Small" />
+                            <MudLink Href="@($"/nodes/{m.NodeId}")" Class="flex-grow-1">@m.Title</MudLink>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@m.Kind</MudChip>
+                            <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.RemoveCircleOutline"
+                                           OnClick="@(() => Remove(m.NodeId))" title="Remove from collection" />
+                        </div>
+                    }
+                }
+
+                <MudDivider Class="my-3" />
+                <div class="d-flex gap-2 align-end">
+                    <div style="min-width:260px;">
+                        <NodeAutocomplete Label="Add a node…" Value="_toAdd"
+                                          ValueChanged="@(n => { _toAdd = n; return Task.CompletedTask; })"
+                                          ExcludeIds="@_memberIds" />
+                    </div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddMember"
+                               Disabled="@(_toAdd is null)">Add</MudButton>
+                </div>
+            </MudPaper>
+
+            <ConnectionsPanel NodeId="Id" />
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-2">Settings</MudText>
+                <MudSelect T="CollectionKind" @bind-Value="_editKind" Label="Kind" Dense="true" Class="mb-2">
+                    @foreach (var k in Enum.GetValues<CollectionKind>())
+                    {
+                        <MudSelectItem T="CollectionKind" Value="k">@k</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_editTitle" Label="Name" Class="mb-2" />
+                <MudTextField @bind-Value="_editBody" Label="Description" Lines="3" Class="mb-2" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettings">Save</MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Collection? _collection;
+    private List<Node> _members = new();
+    private int[] _memberIds = Array.Empty<int>();
+    private Node? _toAdd;
+    private bool _loading = true;
+    private CollectionKind _editKind;
+    private string _editTitle = "";
+    private string? _editBody;
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _collection = await CollectionService.GetAsync(Id);
+        if (_collection?.Node is not null)
+        {
+            _members = await CollectionService.GetMembersAsync(Id);
+            _memberIds = _members.Select(m => m.NodeId).Append(Id).ToArray();
+            _editKind = _collection.Kind;
+            _editTitle = _collection.Node.Title;
+            _editBody = _collection.Node.Body;
+        }
+        _loading = false;
+    }
+
+    private async Task AddMember()
+    {
+        if (_toAdd is null) return;
+        var ok = await CollectionService.AddMemberAsync(Id, _toAdd.NodeId);
+        if (!ok) Snackbar.Add("Already a member.", Severity.Info);
+        _toAdd = null;
+        await Load();
+    }
+
+    private async Task Remove(int nodeId) { await CollectionService.RemoveMemberAsync(Id, nodeId); await Load(); }
+    private async Task Move(int nodeId, bool up) { await CollectionService.MoveMemberAsync(Id, nodeId, up); await Load(); }
+    private async Task TogglePin() { await NodeService.TogglePinAsync(Id); await Load(); }
+
+    private async Task SaveSettings()
+    {
+        await CollectionService.UpdateAsync(Id, _editTitle, _editBody, _editKind, _collection!.Color);
+        Snackbar.Add("Saved", Severity.Success);
+        await Load();
+    }
+}

@@ -1,0 +1,232 @@
+@* Collections area for the Node create/edit/detail experience. Always visible,
+   including with zero collections. Works for a saved node (persisted mode) and
+   for a new/unsaved node (draft mode — selections are applied after the node is
+   saved via ApplyPendingAsync). *@
+@inject ICollectionService CollectionService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div>
+    @if (ShowHeader)
+    {
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Collections" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="flex-grow-1">Collections</MudText>
+            @if (CurrentCount > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@CurrentCount</MudChip>
+            }
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        @* ---- Current memberships (persisted) or pending selections (draft) ---- *@
+        @if (CurrentCount == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">This item is not in any collections yet.</MudText>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap gap-2 mb-1">
+                @if (IsDraft)
+                {
+                    @foreach (var c in _pendingExisting)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
+                                 Icon="@Icons.Material.Filled.Collections" OnClose="@(() => RemovePendingExisting(c))">
+                            @c.Node.Title <MudText Typo="Typo.caption" Class="ml-1">(@c.Kind)</MudText>
+                        </MudChip>
+                    }
+                    @foreach (var d in _pendingNew)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined"
+                                 Icon="@Icons.Material.Filled.FiberNew" OnClose="@(() => _pendingNew.Remove(d))">
+                            @d.Title <MudText Typo="Typo.caption" Class="ml-1">(new @d.Kind)</MudText>
+                        </MudChip>
+                    }
+                }
+                else
+                {
+                    @foreach (var m in _memberships)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
+                                 Icon="@Icons.Material.Filled.Collections" OnClose="@(() => RemoveMember(m.Node.NodeId))">
+                            @m.Node.Title <MudText Typo="Typo.caption" Class="ml-1">(@m.Kind)</MudText>
+                        </MudChip>
+                    }
+                }
+            </div>
+        }
+
+        @* ---- Add / create ---- *@
+        @if (_allActive.Count == 0 && CurrentCount == 0)
+        {
+            @* Zero-collection empty state with a prominent create action. *@
+            <MudPaper Class="pa-3 mt-2 text-center" Outlined="true" Elevation="0">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+                    Create your first collection to organize related notes, people, resources, or actions.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                           OnClick="OpenCreateDialog">Create collection</MudButton>
+            </MudPaper>
+        }
+        else
+        {
+            <div class="d-flex gap-2 align-end mt-2 flex-wrap">
+                <div style="min-width:220px;flex:1;">
+                    <MudAutocomplete T="CollectionSummary" Label="Add to a collection" Dense="true"
+                                     SearchFunc="SearchCollections" Value="null" ValueChanged="OnPickExisting"
+                                     ToStringFunc="@(c => c is null ? string.Empty : c.Node.Title)"
+                                     ResetValueOnEmptyText="true" Clearable="true"
+                                     AdornmentIcon="@Icons.Material.Filled.Search">
+                        <ItemTemplate Context="c">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Collections" Size="Size.Small" />
+                                <span>@c.Node.Title</span>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@c.Kind</MudChip>
+                            </div>
+                        </ItemTemplate>
+                        <NoItemsTemplate>
+                            <MudText Typo="Typo.caption" Class="pa-2 mud-text-secondary">No matching collections.</MudText>
+                        </NoItemsTemplate>
+                    </MudAutocomplete>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CreateNewFolder"
+                           OnClick="OpenCreateDialog">Create collection</MudButton>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>The saved node to assign. Null puts the panel in draft mode.</summary>
+    [Parameter] public int? NodeId { get; set; }
+    [Parameter] public bool ShowHeader { get; set; } = true;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool IsDraft => NodeId is null;
+    private bool _loading = true;
+
+    private List<CollectionSummary> _allActive = new();
+    private List<CollectionSummary> _memberships = new();     // persisted mode
+    private readonly List<CollectionSummary> _pendingExisting = new(); // draft mode
+    private readonly List<CollectionDraft> _pendingNew = new();        // draft mode
+
+    private int CurrentCount => IsDraft ? _pendingExisting.Count + _pendingNew.Count : _memberships.Count;
+
+    /// <summary>True when a draft node has collection selections waiting to be applied.</summary>
+    public bool HasPending => _pendingExisting.Count > 0 || _pendingNew.Count > 0;
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    public async Task ReloadAsync()
+    {
+        _loading = true;
+        _allActive = await CollectionService.GetCollectionsAsync();
+        if (!IsDraft)
+            _memberships = await CollectionService.GetCollectionSummariesForNodeAsync(NodeId!.Value);
+        _loading = false;
+    }
+
+    private HashSet<int> AssignedIds() => IsDraft
+        ? _pendingExisting.Select(c => c.Node.NodeId).ToHashSet()
+        : _memberships.Select(m => m.Node.NodeId).ToHashSet();
+
+    private Task<IEnumerable<CollectionSummary>> SearchCollections(string value, CancellationToken token)
+    {
+        var assigned = AssignedIds();
+        IEnumerable<CollectionSummary> avail = _allActive.Where(c => !assigned.Contains(c.Node.NodeId));
+        if (NodeId is int id) avail = avail.Where(c => c.Node.NodeId != id); // never add a collection to itself
+        if (!string.IsNullOrWhiteSpace(value))
+            avail = avail.Where(c => c.Node.Title.Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(avail.Take(20));
+    }
+
+    private async Task OnPickExisting(CollectionSummary? c)
+    {
+        if (c is null) return;
+        if (IsDraft)
+        {
+            if (_pendingExisting.All(x => x.Node.NodeId != c.Node.NodeId)) _pendingExisting.Add(c);
+        }
+        else
+        {
+            var added = await CollectionService.AddMemberAsync(c.Node.NodeId, NodeId!.Value);
+            if (added) Snackbar.Add($"Added to \"{c.Node.Title}\"", Severity.Success);
+            else Snackbar.Add("Already in that collection.", Severity.Info);
+            await ReloadAsync();
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var existingNames = _allActive.Select(c => c.Node.Title)
+            .Concat(_pendingNew.Select(d => d.Title)).ToList();
+        var parameters = new DialogParameters<CollectionCreateDialog> { { x => x.ExistingNames, existingNames } };
+        var dialog = await DialogService.ShowAsync<CollectionCreateDialog>("Create collection", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not CollectionDraft draft) return;
+
+        if (IsDraft)
+        {
+            _pendingNew.Add(draft);
+            StateHasChanged();
+        }
+        else
+        {
+            try
+            {
+                var node = await CollectionService.CreateAndAddMemberAsync(draft.Title, draft.Kind, draft.Body, NodeId!.Value);
+                Snackbar.Add($"Created \"{node.Title}\" and added this item", Severity.Success);
+                await ReloadAsync();
+                await OnChanged.InvokeAsync();
+            }
+            catch (InvalidOperationException ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task RemoveMember(int collectionNodeId)
+    {
+        await CollectionService.RemoveMemberAsync(collectionNodeId, NodeId!.Value);
+        await ReloadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private void RemovePendingExisting(CollectionSummary c) => _pendingExisting.Remove(c);
+
+    /// <summary>
+    /// Persists a draft node's queued collection selections once the node has been
+    /// saved. Returns any error messages (empty when everything succeeded).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ApplyPendingAsync(int nodeId)
+    {
+        var errors = new List<string>();
+        foreach (var c in _pendingExisting)
+        {
+            try { await CollectionService.AddMemberAsync(c.Node.NodeId, nodeId); }
+            catch (Exception ex) { errors.Add($"{c.Node.Title}: {ex.Message}"); }
+        }
+        foreach (var d in _pendingNew)
+        {
+            try { await CollectionService.CreateAndAddMemberAsync(d.Title, d.Kind, d.Body, nodeId); }
+            catch (Exception ex) { errors.Add($"{d.Title}: {ex.Message}"); }
+        }
+        return errors;
+    }
+
+    public void ClearPending()
+    {
+        _pendingExisting.Clear();
+        _pendingNew.Clear();
+    }
+}

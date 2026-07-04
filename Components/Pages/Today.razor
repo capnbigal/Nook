@@ -1,0 +1,197 @@
+@page "/today"
+@page "/dashboard"
+@inject INodeService NodeService
+@inject IActionService ActionService
+@inject IEventService EventService
+@inject NavigationManager Nav
+
+<PageTitle>Today · Nook</PageTitle>
+
+<div class="d-flex align-center mb-3 gap-2">
+    <MudIcon Icon="@Icons.Material.Filled.Today" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h4" Class="flex-grow-1">Today</MudText>
+</div>
+
+@* Quick capture *@
+<MudPaper Class="pa-3 mb-4 d-flex gap-2 align-center" Elevation="1">
+    <MudIcon Icon="@Icons.Material.Filled.Bolt" Color="Color.Primary" />
+    <MudTextField @bind-Value="_capture" Placeholder="Quick capture — press Enter…" Immediate="true"
+                  Variant="Variant.Text" Margin="Margin.Dense" Class="flex-grow-1 mt-0"
+                  OnKeyDown="OnCaptureKey" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="DoCapture"
+               Disabled="@string.IsNullOrWhiteSpace(_capture)">Capture</MudButton>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            @ActionSection("Overdue", Icons.Material.Filled.Warning, Color.Error, _overdue)
+            @ActionSection("Due soon", Icons.Material.Filled.Event, Color.Primary, _dueSoon)
+            @ReminderSection()
+        </MudItem>
+        <MudItem xs="12" md="6">
+            @NodeSection("Inbox to triage", Icons.Material.Filled.Inbox, _inbox, "/inbox")
+            @NodeSection("Recently updated", Icons.Material.Filled.Update, _recent, "/all")
+            @NodeSection("Pinned", Icons.Material.Filled.PushPin, _pinned, "/all")
+            @EventSection()
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private string? _capture;
+    private bool _loading = true;
+    private List<ActionItem> _overdue = new();
+    private List<ActionItem> _dueSoon = new();
+    private List<ActionItem> _upcomingReminders = new();
+    private List<ActionItem> _overdueReminders = new();
+    private List<Node> _inbox = new();
+    private List<Node> _recent = new();
+    private List<Node> _pinned = new();
+    private List<Node> _events = new();
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _overdue = await ActionService.GetOverdueAsync();
+        _dueSoon = await ActionService.GetOpenDueAsync(DateTime.UtcNow.AddDays(7));
+        _dueSoon = _dueSoon.Where(a => a.DueDate >= DateTime.UtcNow).ToList();
+        _upcomingReminders = await ActionService.GetUpcomingRemindersAsync();
+        _overdueReminders = await ActionService.GetOverdueRemindersAsync();
+        _inbox = await NodeService.GetInboxAsync(8);
+        _recent = await NodeService.GetRecentlyUpdatedAsync(6);
+        _pinned = await NodeService.GetPinnedAsync(6);
+        _events = await EventService.GetTimelineAsync(5);
+        _loading = false;
+    }
+
+    private async Task OnCaptureKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoCapture();
+    }
+
+    private async Task DoCapture()
+    {
+        if (string.IsNullOrWhiteSpace(_capture)) return;
+        await NodeService.QuickCaptureAsync(_capture);
+        _capture = null;
+        await Load();
+    }
+
+    private async Task ToggleAction(ActionItem a)
+    {
+        if (a.Status == ActionStatus.Done) await ActionService.ReopenAsync(a.ActionItemId);
+        else await ActionService.CompleteAsync(a.ActionItemId);
+        await Load();
+    }
+
+    private RenderFragment ActionSection(string title, string icon, Color color, List<ActionItem> items) =>@<MudPaper Class="pa-4 mb-4" Elevation="1">
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@icon" Color="@color" />
+            <MudText Typo="Typo.h6" Class="flex-grow-1">@title</MudText>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@items.Count</MudChip>
+        </div>
+        @if (items.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Nothing here.</MudText>
+        }
+        else
+        {
+            @foreach (var a in items)
+            {
+                <div class="d-flex align-center gap-2 py-1">
+                    <MudCheckBox T="bool" Value="false" ValueChanged="@(_ => ToggleAction(a))" Dense="true" />
+                    <span class="flex-grow-1">@a.Title</span>
+                    @if (a.TargetNode is not null)
+                    {
+                        <MudLink Href="@($"/nodes/{a.TargetNodeId}")" Typo="Typo.caption">@a.TargetNode.Title</MudLink>
+                    }
+                    @if (a.DueDate is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@a.DueDate.Value.ToLocalTime().ToString("d")</MudText>
+                    }
+                </div>
+            }
+        }
+    </MudPaper>;
+
+    private RenderFragment ReminderSection() =>@<MudPaper Class="pa-4 mb-4" Elevation="1">
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Alarm" Color="Color.Info" />
+            <MudText Typo="Typo.h6" Class="flex-grow-1">Reminders</MudText>
+        </div>
+        @if (_overdueReminders.Count == 0 && _upcomingReminders.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">No reminders due.</MudText>
+        }
+        else
+        {
+            @foreach (var a in _overdueReminders.Concat(_upcomingReminders))
+            {
+                <div class="d-flex align-center gap-2 py-1">
+                    <MudCheckBox T="bool" Value="false" ValueChanged="@(_ => ToggleAction(a))" Dense="true" />
+                    <span class="flex-grow-1">@a.Title</span>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(a.RemindAt < DateTime.UtcNow ? Color.Error : Color.Default)" Variant="Variant.Text">
+                        @a.RemindAt?.ToLocalTime().ToString("d")
+                    </MudChip>
+                </div>
+            }
+        }
+    </MudPaper>;
+
+    private RenderFragment NodeSection(string title, string icon, List<Node> nodes, string href) =>@<MudPaper Class="pa-4 mb-4" Elevation="1">
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@icon" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="flex-grow-1">@title</MudText>
+            <MudLink Href="@href" Typo="Typo.caption">View all</MudLink>
+        </div>
+        @if (nodes.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Nothing here.</MudText>
+        }
+        else
+        {
+            @foreach (var n in nodes)
+            {
+                <div class="d-flex align-center gap-2 py-1">
+                    <MudIcon Icon="@NodeUi.Icon(n.Kind)" Size="Size.Small" />
+                    <MudLink Href="@($"/nodes/{n.NodeId}")" Class="flex-grow-1">@n.Title</MudLink>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@n.Kind</MudChip>
+                </div>
+            }
+        }
+    </MudPaper>;
+
+    private RenderFragment EventSection() =>@<MudPaper Class="pa-4 mb-4" Elevation="1">
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Event" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="flex-grow-1">Recent events</MudText>
+            <MudLink Href="/events" Typo="Typo.caption">View all</MudLink>
+        </div>
+        @if (_events.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">No events yet.</MudText>
+        }
+        else
+        {
+            @foreach (var n in _events)
+            {
+                <div class="d-flex align-center gap-2 py-1">
+                    <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" />
+                    <MudLink Href="@($"/nodes/{n.NodeId}")" Class="flex-grow-1">@n.Title</MudLink>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        @(n.EventDetails?.OccurredAt.ToLocalTime().ToString("d"))
+                    </MudText>
+                </div>
+            }
+        }
+    </MudPaper>;
+}

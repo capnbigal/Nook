@@ -1,0 +1,11 @@
+@page "/all"
+<PageTitle>All · Nook</PageTitle>
+
+<NodeListView Title="All" Icon="@Icons.Material.Filled.AllInbox" ShowDates="true"
+              Description="Every active node you own."
+              EmptyText="No nodes yet. Use the + button to capture something."
+              Filter="_filter" />
+
+@code {
+    private readonly NodeFilter _filter = new();
+}

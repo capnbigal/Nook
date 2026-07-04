@@ -487,3 +487,4 @@ $RECYCLE.BIN/
 # Local run logs (temp)
 run.out.txt
 run.err.txt
+.superpowers/

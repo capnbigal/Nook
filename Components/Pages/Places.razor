@@ -1,0 +1,11 @@
+@page "/places"
+<PageTitle>Places · Nook</PageTitle>
+
+<NodeListView Title="Places" Icon="@Icons.Material.Filled.Place"
+              Description="Locations you reference in notes and events."
+              EmptyText="No places yet. Capture a node and promote it to a Place."
+              Filter="_filter" />
+
+@code {
+    private readonly NodeFilter _filter = new() { Kind = NodeKind.Place };
+}
