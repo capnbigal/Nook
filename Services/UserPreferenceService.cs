@@ -23,7 +23,20 @@ public sealed class UserPreferenceService : IUserPreferenceService
         {
             pref = new UserPreference { UserId = userId, RecentNodeIdsCsv = "", UpdatedAt = DateTime.UtcNow };
             db.UserPreferences.Add(pref);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Concurrent first-create race (e.g. two tabs on first login): the unique
+                // index on UserId guarantees only one row ever exists, but a racing call may
+                // have inserted it between our check and our insert. Detach the failed entity
+                // and re-query the row the other call just wrote, so callers still get a
+                // usable row instead of a thrown exception.
+                db.Entry(pref).State = EntityState.Detached;
+                pref = await db.UserPreferences.FirstAsync(p => p.UserId == userId, ct);
+            }
         }
         return pref;
     }
