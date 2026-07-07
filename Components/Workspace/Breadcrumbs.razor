@@ -1,0 +1,34 @@
+@implements IDisposable
+<nav class="nook-breadcrumbs" aria-label="Breadcrumb">
+    @if (Workspace.Trail.Count == 0)
+    {
+        <span class="mud-text-secondary">Nook</span>
+    }
+    else
+    {
+        @for (var i = 0; i < Workspace.Trail.Count; i++)
+        {
+            var crumb = Workspace.Trail[i];
+            var isLast = i == Workspace.Trail.Count - 1;
+            if (isLast || crumb.Href is null)
+            {
+                <span class="crumb crumb-current">@crumb.Label</span>
+            }
+            else
+            {
+                <MudLink Href="@crumb.Href" Class="crumb">@crumb.Label</MudLink>
+                <span class="crumb-sep">/</span>
+            }
+        }
+    }
+</nav>
+
+@code {
+    [CascadingParameter] public WorkspaceState Workspace { get; set; } = default!;
+
+    protected override void OnInitialized() => Workspace.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Workspace.Changed -= OnChanged;
+}

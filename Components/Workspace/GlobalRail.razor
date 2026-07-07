@@ -1,0 +1,16 @@
+<div class="@($"nook-rail-inner {Class}")">
+    <div class="rail-group">
+        <MudIconButton Icon="@Icons.Material.Filled.Home" Href="/today" title="Home" />
+        <MudIconButton Icon="@Icons.Material.Filled.Search" Href="/search" title="Search" />
+        <MudIconButton Icon="@Icons.Material.Filled.Description" Href="/all" title="Pages" />
+        <MudIconButton Icon="@Icons.Material.Filled.Draw" Disabled="true" title="Canvas (coming soon)" />
+    </div>
+    <div class="rail-group">
+        <MudIconButton Icon="@Icons.Material.Filled.Settings" Href="/tags" title="Settings" />
+        <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Href="/Account/Manage" title="Account" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+}

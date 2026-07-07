@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
+@using Nook.Components.Workspace
 @inject ThemeState Theme
 @inject WorkspaceState Workspace
 @inject IJSRuntime JS
@@ -11,10 +12,10 @@
 
 <CascadingValue Value="Workspace">
     <div class="nook-shell">
-        <div class="nook-rail"></div>
+        <GlobalRail Class="nook-rail" />
         <div class="nook-sidebar"></div>
         <div class="nook-main">
-            <div class="nook-topbar"></div>
+            <TopBar Class="nook-topbar" OnOpenPalette="OpenPalette" />
             <main class="nook-content">@Body</main>
         </div>
     </div>
@@ -27,9 +28,8 @@
 </div>
 
 @code {
-    // Task 15/16 replace the placeholder divs above (.nook-rail -> <GlobalRail/>,
-    // .nook-sidebar -> <WorkspaceSidebar/>, .nook-topbar -> <TopBar/>). Task 19 adds
-    // <CommandPalette/> inside the CascadingValue and wires OpenPalette + mod+k.
+    // Task 16 replaces the remaining placeholder div above (.nook-sidebar -> <WorkspaceSidebar/>).
+    // Task 19 adds <CommandPalette/> inside the CascadingValue and wires it into OpenPalette.
     private readonly MudTheme _theme = NookTheme.Build();
     private IJSObjectReference? _shortcutsModule;
     private IJSObjectReference? _themeModule;
@@ -72,13 +72,15 @@
                 Nav.NavigateTo("/inbox");
                 break;
             case "mod+k":
-                // Task 19 wires the command palette
+                OpenPalette();
                 break;
         }
         return InvokeAsync(StateHasChanged);
     }
 
     private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    private void OpenPalette() { /* Task 19 wires the command palette */ }
 
     public async ValueTask DisposeAsync()
     {

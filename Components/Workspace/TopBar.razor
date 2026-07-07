@@ -1,0 +1,28 @@
+@implements IDisposable
+@inject ThemeState Theme
+@inject IJSRuntime JS
+<div class="@($"nook-topbar-inner {Class}")">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" title="Back"
+                   OnClick="@(() => JS.InvokeVoidAsync("history.back"))" />
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" title="Forward"
+                   OnClick="@(() => JS.InvokeVoidAsync("history.forward"))" />
+    <Breadcrumbs />
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Search"
+               OnClick="OnOpenPalette">⌘K</MudButton>
+    <MudIconButton Size="Size.Small"
+                   Icon="@(Theme.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                   title="Toggle light/dark"
+                   OnClick="@(() => Theme.SetAsync(!Theme.IsDarkMode))" />
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback OnOpenPalette { get; set; }
+
+    protected override void OnInitialized() => Theme.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Theme.Changed -= OnChanged;
+}
