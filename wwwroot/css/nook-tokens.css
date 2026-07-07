@@ -264,3 +264,33 @@
   height: 1.05em;
   cursor: pointer;
 }
+
+/* [[wiki-link]] autocomplete dropdown (appended to <body> by the editor JS,
+   so it must be global). Positioned via position:fixed + caret coords. */
+.nook-wikimenu {
+  position: fixed;
+  z-index: 1400;
+  min-width: 220px;
+  max-width: 360px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(38, 33, 24, 0.18);
+  padding: 4px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+}
+.nook-wikimenu__row {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nook-wikimenu__row.is-active {
+  background: color-mix(in srgb, var(--brand-iris) 14%, var(--card));
+}
