@@ -60,10 +60,13 @@ public sealed class NodeService : INodeService
                 n.NodeTags.Any(nt => nt.Tag.Name.Contains(s)));
         }
 
-        return await query
+        query = query
             .OrderByDescending(n => n.IsPinned)
-            .ThenByDescending(n => n.UpdatedAt)
-            .ToListAsync();
+            .ThenByDescending(n => n.UpdatedAt);
+
+        if (filter.Take is int t) query = query.Take(t);
+
+        return await query.ToListAsync();
     }
 
     public async Task<Node?> GetByIdAsync(int id)
