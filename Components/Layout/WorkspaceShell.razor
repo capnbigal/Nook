@@ -4,6 +4,7 @@
 @inject ThemeState Theme
 @inject WorkspaceState Workspace
 @inject IJSRuntime JS
+@inject INodeService NodeService
 
 <MudThemeProvider Theme="_theme" IsDarkMode="Theme.IsDarkMode" />
 <MudPopoverProvider />
@@ -19,7 +20,7 @@
             <main class="nook-content">@Body</main>
         </div>
     </div>
-    <CommandPalette Open="_paletteOpen" OpenChanged="v => _paletteOpen = v" Actions="_commands" />
+    <CommandPalette Open="_paletteOpen" OpenChanged="v => _paletteOpen = v" Actions="_commands" OnCreate="HandleCreate" />
 </CascadingValue>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -34,7 +35,7 @@
     private IJSObjectReference? _themeModule;
     private DotNetObjectReference<WorkspaceShell>? _dotNetRef;
     private bool _paletteOpen;
-    private IReadOnlyList<Command> _commands = Array.Empty<Command>(); // Task 20 populates this
+    private IReadOnlyList<Command> _commands = Array.Empty<Command>();
 
     [Inject] private NavigationManager Nav { get; set; } = default!;
 
@@ -44,6 +45,69 @@
         await Workspace.InitializeAsync();
         Theme.Changed += OnStateChanged;
         Workspace.Changed += OnStateChanged;
+        BuildCommands();
+    }
+
+    /// <summary>Builds the palette's Actions list from live services. Rebuilt after the theme
+    /// toggle so its label flips ("Switch to light/dark mode") without a full page reload.</summary>
+    private void BuildCommands()
+    {
+        var list = new List<Command>
+        {
+            new("Actions", "Quick capture to Inbox", Icons.Material.Filled.FlashOn, "⌘↵",
+                async () =>
+                {
+                    var n = await NodeService.QuickCaptureAsync("Untitled");
+                    await Workspace.NoteVisitedAsync(n.NodeId);
+                    Nav.NavigateTo($"/nodes/{n.NodeId}");
+                    _paletteOpen = false;
+                }),
+            new("Actions", Theme.IsDarkMode ? "Switch to light mode" : "Switch to dark mode",
+                Icons.Material.Filled.DarkMode, null,
+                async () =>
+                {
+                    await Theme.SetAsync(!Theme.IsDarkMode);
+                    BuildCommands();
+                }),
+        };
+
+        foreach (var kind in NodeUi.AssignableKinds)
+        {
+            var k = kind;
+            list.Add(new Command("Actions", $"New {k}", NodeUi.Icon(k), null,
+                async () =>
+                {
+                    var node = await NodeService.CreateAsync(new Node { Title = $"New {k}", Kind = k });
+                    await Workspace.NoteVisitedAsync(node.NodeId);
+                    Nav.NavigateTo($"/nodes/{node.NodeId}");
+                    _paletteOpen = false;
+                }));
+        }
+
+        void Go(string label, string icon, string url) =>
+            list.Add(new Command("Go to", label, icon, null, () =>
+            {
+                Nav.NavigateTo(url);
+                _paletteOpen = false;
+                return Task.CompletedTask;
+            }));
+        Go("Go to Home", Icons.Material.Filled.Home, "/today");
+        Go("Go to Inbox", Icons.Material.Filled.Inbox, "/inbox");
+        Go("Go to Search", Icons.Material.Filled.Search, "/search");
+        Go("Go to All", Icons.Material.Filled.ViewList, "/all");
+        Go("Go to Collections", Icons.Material.Filled.Collections, "/collections");
+        Go("Go to Nookryptex", Icons.Material.Filled.ViewInAr, "/nookryptex");
+
+        _commands = list;
+    }
+
+    /// <summary>⌘↵ from the palette: quick-captures the typed query as the node title.</summary>
+    private async Task HandleCreate(string query)
+    {
+        var n = await NodeService.QuickCaptureAsync(query);
+        await Workspace.NoteVisitedAsync(n.NodeId);
+        Nav.NavigateTo($"/nodes/{n.NodeId}");
+        _paletteOpen = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

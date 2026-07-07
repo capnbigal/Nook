@@ -39,6 +39,7 @@
     [Parameter] public bool Open { get; set; }
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
     [Parameter] public IReadOnlyList<Command> Actions { get; set; } = Array.Empty<Command>();
+    [Parameter] public EventCallback<string> OnCreate { get; set; }
 
     private ElementReference _input;
     private string _query = "";
@@ -126,6 +127,13 @@
                 break;
             case "k" when e.CtrlKey:
                 _active = Math.Max(_active - 1, 0);
+                break;
+            case "Enter" when (e.MetaKey || e.CtrlKey):
+                if (!string.IsNullOrWhiteSpace(_query))
+                {
+                    await OnCreate.InvokeAsync(_query.Trim());
+                    await CloseAsync();
+                }
                 break;
             case "Enter":
                 if (_active >= 0 && _active < _visible.Count) await InvokeRowAsync(_visible[_active]);
