@@ -13,7 +13,7 @@
 <CascadingValue Value="Workspace">
     <div class="nook-shell">
         <GlobalRail Class="nook-rail" />
-        <div class="nook-sidebar"></div>
+        <WorkspaceSidebar Class="nook-sidebar" />
         <div class="nook-main">
             <TopBar Class="nook-topbar" OnOpenPalette="OpenPalette" />
             <main class="nook-content">@Body</main>
@@ -28,7 +28,6 @@
 </div>
 
 @code {
-    // Task 16 replaces the remaining placeholder div above (.nook-sidebar -> <WorkspaceSidebar/>).
     // Task 19 adds <CommandPalette/> inside the CascadingValue and wires it into OpenPalette.
     private readonly MudTheme _theme = NookTheme.Build();
     private IJSObjectReference? _shortcutsModule;
