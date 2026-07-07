@@ -1,0 +1,3 @@
+.node-page{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1.5rem;align-items:start;}
+.node-page__main{min-width:0;display:flex;flex-direction:column;gap:1.25rem;}
+@media (max-width:960px){.node-page{grid-template-columns:1fr;}}

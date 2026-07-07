@@ -1,0 +1,54 @@
+@page "/nodes/{Id:int}"
+@using Nook.Models
+@using Nook.Services
+@inject INodeService NodeService
+@inject WorkspaceState Workspace
+
+<PageTitle>@(_node?.Title ?? "Node") · Nook</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_node is null)
+{
+    <MudAlert Severity="Severity.Error">Node not found.</MudAlert>
+}
+else
+{
+    <div class="node-page">
+        <div class="node-page__main">
+            <NodeHeader Node="_node" OnTitleChanged="OnTitleChanged" />
+            <EditorHost NodeId="_node.NodeId" InitialBody="@(_node.Body ?? string.Empty)" />
+            <BacklinksPanel NodeId="_node.NodeId" RefreshToken="_refresh" />
+            <ActivityStrip NodeId="_node.NodeId" UserId="@_node.UserId" RefreshToken="_refresh" />
+        </div>
+        <PropertiesPanel Node="_node" OnChanged="ReloadAsync" @bind-Collapsed="_propsCollapsed" />
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Node? _node;
+    private bool _loading = true;
+    private bool _propsCollapsed;
+    private int _refresh;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _node = await NodeService.GetByIdAsync(Id);
+        if (_node is not null) await Workspace.NoteVisitedAsync(Id);
+        _loading = false;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _node = await NodeService.GetByIdAsync(Id);
+        _refresh++;              // force Backlinks/Activity re-query
+    }
+
+    private async Task OnTitleChanged(string _) => await ReloadAsync();
+}
