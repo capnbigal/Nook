@@ -28,7 +28,7 @@
         _module = await JS.InvokeAsync<IJSObjectReference>(
             "import", "./Components/Nodes/EditorHost.razor.js");
         await _module.InvokeVoidAsync("initialize", _el, _ref, InitialBody ?? "",
-            new { debounceMs = 800 });
+            new { debounceMs = 800, bundleUrl = EditorBundle.Url });
     }
 
     // Editor owns its DOM/state after init — never let Blazor re-render over it.

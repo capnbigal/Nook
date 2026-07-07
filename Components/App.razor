@@ -1,4 +1,3 @@
-@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Endpoints
 <!DOCTYPE html>
 <html lang="en">
@@ -12,7 +11,7 @@
     <link rel="stylesheet" href="@Assets["Nook.styles.css"]" />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="@Assets["css/nook-tokens.css"]" />
-    <ImportMap AdditionalImportMapDefinition="EditorImportMap" />
+    <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet @rendermode="@PageRenderMode" />
 </head>
@@ -32,12 +31,4 @@
 
     private IComponentRenderMode? PageRenderMode =>
         HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
-
-    private static readonly ImportMapDefinition EditorImportMap = new(
-        new Dictionary<string, string>
-        {
-            ["nook-editor"] = "/lib/editor/nook-editor.JKW3RB33.js"
-        },
-        scopes: null,
-        integrity: null);
 }

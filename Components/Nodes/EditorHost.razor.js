@@ -1,14 +1,18 @@
-import * as NookEditor from "nook-editor";
-
+// The vendored TipTap bundle is loaded by its resolved absolute URL (passed in
+// via opts.bundleUrl from EditorBundle.Url) rather than a bare "nook-editor"
+// specifier — bare specifiers require an import map, which Blazor's <ImportMap>
+// did not emit for a custom entry.
 let editor = null;
 let dotNetRef = null;
 let debounceMs = 800;
 let timer = null;
 let dirty = false;
 
-export function initialize(el, ref, initialMarkdown, opts) {
+export async function initialize(el, ref, initialMarkdown, opts) {
     dotNetRef = ref;
     debounceMs = (opts && opts.debounceMs) || 800;
+
+    const NookEditor = await import(opts.bundleUrl);
 
     editor = new NookEditor.Editor({
         element: el,
