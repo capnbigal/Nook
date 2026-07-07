@@ -18,27 +18,30 @@ public sealed class WikiLinkService : IWikiLinkService
     public async Task<(int nodeId, string url)> ResolveOrCreateAsync(string title, CancellationToken ct = default)
     {
         var trimmed = (title ?? string.Empty).Trim();
-        // Contains-match then exact-title filter, scoped to the current user by NodeService.
-        var candidates = await _nodes.QueryAsync(new NodeFilter { SearchText = trimmed, Take = 25 });
-        var match = candidates.FirstOrDefault(n =>
-            string.Equals(n.Title, trimmed, StringComparison.OrdinalIgnoreCase));
+        if (trimmed.Length == 0) return (0, string.Empty); // sentinel: no link for a blank title
+
+        // Real exact-title lookup, scoped to the current user by NodeService — no substring
+        // search window to fall out of, so this can't miss an existing node and duplicate it.
+        var match = await _nodes.FindByExactTitleAsync(trimmed, ct);
         var id = match?.NodeId ?? (await _nodes.QuickCaptureAsync(trimmed)).NodeId;
         return (id, $"/nodes/{id}");
     }
 
     public async Task ReconcileAsync(int sourceNodeId, IReadOnlyCollection<string> linkedTitles, CancellationToken ct = default)
     {
-        // Resolve desired targets (dedupe by resolved node id; drop self-links).
+        // Look this up first so a missing "mentions" type can't leave newly-created
+        // Inbox nodes behind from the resolve loop below with no relation work done.
+        var mentionsType = (await _relations.GetRelationTypesAsync())
+            .FirstOrDefault(rt => rt.Name == MentionsRelationName);
+        if (mentionsType is null) return; // seed data missing; nothing to reconcile against
+
+        // Resolve desired targets (dedupe by resolved node id; drop self-links and blank-title sentinels).
         var desired = new HashSet<int>();
         foreach (var t in linkedTitles.Where(s => !string.IsNullOrWhiteSpace(s)))
         {
             var (id, _) = await ResolveOrCreateAsync(t, ct);
-            if (id != sourceNodeId) desired.Add(id);
+            if (id != 0 && id != sourceNodeId) desired.Add(id);
         }
-
-        var mentionsType = (await _relations.GetRelationTypesAsync())
-            .FirstOrDefault(rt => rt.Name == MentionsRelationName);
-        if (mentionsType is null) return; // seed data missing; nothing to reconcile against
 
         var connections = await _relations.GetConnectionsAsync(sourceNodeId);
         var existing = connections.Outgoing

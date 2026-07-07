@@ -80,6 +80,16 @@ public sealed class NodeService : INodeService
             .FirstOrDefaultAsync(n => n.NodeId == id && n.UserId == userId);
     }
 
+    public async Task<Node?> FindByExactTitleAsync(string title, CancellationToken ct = default)
+    {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        return await db.Nodes
+            .Where(n => n.UserId == userId && n.Title == title)
+            .OrderByDescending(n => n.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<Node> CreateAsync(Node node, IEnumerable<int>? tagIds = null)
     {
         var userId = await _currentUser.GetRequiredUserIdAsync();

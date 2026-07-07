@@ -8,6 +8,8 @@ public interface INodeService
     // ---- Querying ----
     Task<List<Node>> QueryAsync(NodeFilter filter);
     Task<Node?> GetByIdAsync(int id);
+    /// <summary>Find the current user's node with an exact (case-sensitive) Title match. Most-recently-updated wins if duplicates exist; null if none.</summary>
+    Task<Node?> FindByExactTitleAsync(string title, CancellationToken ct = default);
 
     // ---- Mutations ----
     Task<Node> CreateAsync(Node node, IEnumerable<int>? tagIds = null);

@@ -37,6 +37,55 @@ public class WikiLinkServiceTests
     }
 
     [Fact]
+    public async Task ResolveOrCreate_finds_exact_title_even_when_search_window_is_full_of_substring_matches()
+    {
+        var h = new GraphHarness();
+        var nodes = h.Nodes("u");
+
+        // The exact-title node is created first (older) and never pinned, so under the
+        // old Contains-search-then-filter approach it would fall outside a Take(25) window
+        // once 30+ more-recently-updated, pinned nodes merely CONTAINING "Meeting" exist.
+        var exact = await nodes.CreateAsync(new Node { Title = "Meeting", State = NodeState.Active });
+
+        for (var i = 0; i < 30; i++)
+        {
+            await nodes.CreateAsync(new Node
+            {
+                Title = $"Standup notes {i}",
+                Body = "Recap of yesterday's Meeting agenda.",
+                State = NodeState.Active,
+                IsPinned = true,
+            });
+        }
+
+        var countBefore = (await nodes.QueryAsync(new NodeFilter { Take = 1000 })).Count;
+
+        var (id, url) = await Svc(h, "u").ResolveOrCreateAsync("Meeting");
+
+        Assert.Equal(exact.NodeId, id);
+        Assert.Equal($"/nodes/{exact.NodeId}", url);
+
+        var countAfter = (await nodes.QueryAsync(new NodeFilter { Take = 1000 })).Count;
+        Assert.Equal(countBefore, countAfter); // no duplicate Inbox node created
+    }
+
+    [Fact]
+    public async Task ResolveOrCreate_returns_sentinel_for_blank_title_and_creates_nothing()
+    {
+        var h = new GraphHarness();
+        var nodes = h.Nodes("u");
+        var countBefore = (await nodes.QueryAsync(new NodeFilter { Take = 1000 })).Count;
+
+        var (id, url) = await Svc(h, "u").ResolveOrCreateAsync("   ");
+
+        Assert.Equal(0, id);
+        Assert.Equal(string.Empty, url);
+
+        var countAfter = (await nodes.QueryAsync(new NodeFilter { Take = 1000 })).Count;
+        Assert.Equal(countBefore, countAfter);
+    }
+
+    [Fact]
     public async Task ResolveOrCreate_ignores_cross_user_titles()
     {
         var h = new GraphHarness();
