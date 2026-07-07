@@ -1,0 +1,18 @@
+@using Nook.Models
+@using Nook.Services
+
+<span class="nook-otb nook-otb--@Size.ToString().ToLowerInvariant()" title="@Kind">
+    <span class="nook-otb__dot"
+          style="background: var(@NodeUi.KindAccentVar(Kind), @NodeUi.KindAccent(Kind));"></span>
+    <MudIcon Icon="@NodeUi.Icon(Kind)" Size="Size" Style="@($"color: var({NodeUi.KindAccentVar(Kind)}, {NodeUi.KindAccent(Kind)});")" />
+    @if (ShowLabel)
+    {
+        <span class="nook-otb__label">@Kind.ToString()</span>
+    }
+</span>
+
+@code {
+    [Parameter] public NodeKind Kind { get; set; }
+    [Parameter] public bool ShowLabel { get; set; } = true;
+    [Parameter] public Size Size { get; set; } = Size.Small;
+}
