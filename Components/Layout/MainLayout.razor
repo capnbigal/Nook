@@ -45,8 +45,7 @@
     private bool _isDarkMode;
     private string? _search;
 
-    // Default theme; customise the palette here later if desired.
-    private readonly MudTheme _theme = new();
+    private readonly MudTheme _theme = NookTheme.Build();
 
     [Inject] private NavigationManager Nav { get; set; } = default!;
 
