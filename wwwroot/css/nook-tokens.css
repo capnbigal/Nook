@@ -1,0 +1,56 @@
+/* @font-face rules injected by fonts task */
+
+/* nook-tokens.css — design-token layer. Loaded AFTER MudBlazor so it wins. */
+:root {
+  /* Brand */
+  --brand-iris: #5B54E8;
+  --brand-tangerine: #F98A3C;
+
+  /* Surfaces — Sand light (default) */
+  --canvas: #F7F5F0;
+  --card: #FFFFFF;
+  --surface: #FFFFFF;
+  --ink: #262119;
+  --line: #E9E4D9;
+
+  /* Kind accents (order matches Models/GraphEnums.cs NodeKind) */
+  --kind-unclassified: #8C8578;
+  --kind-note: #4C7DF0;
+  --kind-journal: #E0863C;
+  --kind-observation: #14B8A6;
+  --kind-idea: #F5B417;
+  --kind-reference: #5878A6;
+  --kind-bookmark: #F2416A;
+  --kind-list: #23A968;
+  --kind-person: #F76F5A;
+  --kind-project: #7C5CFF;
+  --kind-place: #A15C34;
+  --kind-organization: #A24C8C;
+  --kind-topic: #17B0C4;
+  --kind-resource: #7E9C24;
+  --kind-collection: #B78430;
+  --kind-event: #EE5D9A;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+
+  /* Radius */
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+
+  /* Motion */
+  --motion-fast: 120ms; --motion-base: 200ms; --motion-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-theme="dark"] {
+  --canvas: #16130E;
+  --card: #201C15;
+  --surface: #201C15;
+  --ink: #F3EEE4;
+  --line: #2C271E;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion-base: 0ms; --motion-slow: 0ms; }
+}
