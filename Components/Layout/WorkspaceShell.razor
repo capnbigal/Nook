@@ -19,6 +19,7 @@
             <main class="nook-content">@Body</main>
         </div>
     </div>
+    <CommandPalette Open="_paletteOpen" OpenChanged="v => _paletteOpen = v" Actions="_commands" />
 </CascadingValue>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -28,11 +29,12 @@
 </div>
 
 @code {
-    // Task 19 adds <CommandPalette/> inside the CascadingValue and wires it into OpenPalette.
     private readonly MudTheme _theme = NookTheme.Build();
     private IJSObjectReference? _shortcutsModule;
     private IJSObjectReference? _themeModule;
     private DotNetObjectReference<WorkspaceShell>? _dotNetRef;
+    private bool _paletteOpen;
+    private IReadOnlyList<Command> _commands = Array.Empty<Command>(); // Task 20 populates this
 
     [Inject] private NavigationManager Nav { get; set; } = default!;
 
@@ -79,7 +81,7 @@
 
     private void OnStateChanged() => InvokeAsync(StateHasChanged);
 
-    private void OpenPalette() { /* Task 19 wires the command palette */ }
+    private void OpenPalette() { _paletteOpen = true; StateHasChanged(); }
 
     public async ValueTask DisposeAsync()
     {

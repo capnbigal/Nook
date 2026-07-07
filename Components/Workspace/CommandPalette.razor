@@ -1,0 +1,159 @@
+@using Nook.Models
+@using Nook.Services
+@inject INodeService NodeService
+@inject WorkspaceState Workspace
+@inject NavigationManager Nav
+
+@if (Open)
+{
+    <div class="nook-palette-overlay" @onclick="CloseAsync">
+        <div class="nook-palette" @onclick:stopPropagation="true" @onkeydown="OnKeyDown">
+            <input @ref="_input" class="nook-palette-input" placeholder="Type a command or search…"
+                   value="@_query" @oninput="OnQueryChanged" />
+            <div class="nook-palette-list">
+                @{ var i = 0; }
+                @foreach (var group in _visible.GroupBy(r => r.Command.Group))
+                {
+                    <div class="nook-palette-section">@group.Key</div>
+                    @foreach (var row in group)
+                    {
+                        var idx = i++;
+                        <div class="nook-palette-row @(idx == _active ? "is-active" : "")"
+                             @onclick="() => InvokeRowAsync(row)" @onmouseenter="() => _active = idx">
+                            <MudIcon Icon="@row.Command.Icon" Size="Size.Small" />
+                            <span class="nook-palette-label">@row.Command.Label</span>
+                            @if (row.Command.Shortcut is not null) { <kbd>@row.Command.Shortcut</kbd> }
+                        </div>
+                    }
+                }
+                @if (_visible.Count == 0)
+                {
+                    <div class="nook-palette-empty">No results</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public IReadOnlyList<Command> Actions { get; set; } = Array.Empty<Command>();
+
+    private ElementReference _input;
+    private string _query = "";
+    private int _active;
+    private CancellationTokenSource? _debounce;
+    private bool _focusPending;
+
+    private sealed record Row(Command Command);
+    private List<Row> _nodeRows = new();
+    private List<Row> _visible = new();
+
+    /// <summary>Imperative open, callable via @ref. The shell drives Open via the bound
+    /// Open/OpenChanged parameters instead; this is kept for parity with the palette contract.</summary>
+    public void Show()
+    {
+        Open = true;
+        _focusPending = true;
+        Recompute();
+        StateHasChanged();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Open) _focusPending = true;
+        Recompute();
+    }
+
+    private void Recompute()
+    {
+        // Actions filtered purely; Recents shown when query empty; Nodes from last server fetch.
+        var actionHits = CommandRegistry.Match(_query, Actions).Select(c => new Row(c));
+        IEnumerable<Row> recents = string.IsNullOrWhiteSpace(_query)
+            ? Workspace.Recents.Select(r => new Row(new Command("Recents", r.Title, NodeUi.Icon(r.Kind), null,
+                  () => { Nav.NavigateTo($"/nodes/{r.Id}"); return CloseAsync(); })))
+            : Array.Empty<Row>();
+        _visible = actionHits.Concat(_nodeRows).Concat(recents).ToList();
+        if (_active >= _visible.Count) _active = Math.Max(0, _visible.Count - 1);
+    }
+
+    private async Task OnQueryChanged(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? "";
+        _active = 0;
+        Recompute();               // instant client-side (Actions/Recents)
+
+        _debounce?.Cancel();
+        var cts = new CancellationTokenSource();
+        _debounce = cts;
+        var token = cts.Token;
+        try { await Task.Delay(250, token); }
+        catch (TaskCanceledException) { return; }
+        if (token.IsCancellationRequested) return;
+
+        if (string.IsNullOrWhiteSpace(_query))
+        {
+            _nodeRows = new();
+            Recompute();
+            StateHasChanged();
+            return;
+        }
+
+        var nodes = await NodeService.QueryAsync(new NodeFilter { SearchText = _query, Take = 8 });
+        if (token.IsCancellationRequested) return;
+
+        _nodeRows = nodes.Select(n => new Row(new Command("Nodes", n.Title, NodeUi.Icon(n.Kind), null,
+            () => { Nav.NavigateTo($"/nodes/{n.NodeId}"); return CloseAsync(); }))).ToList();
+        Recompute();
+        StateHasChanged();
+    }
+
+    private async Task InvokeRowAsync(Row row) => await row.Command.Invoke();
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                _active = Math.Min(_active + 1, _visible.Count - 1);
+                break;
+            case "j" when e.CtrlKey:
+                _active = Math.Min(_active + 1, _visible.Count - 1);
+                break;
+            case "ArrowUp":
+                _active = Math.Max(_active - 1, 0);
+                break;
+            case "k" when e.CtrlKey:
+                _active = Math.Max(_active - 1, 0);
+                break;
+            case "Enter":
+                if (_active >= 0 && _active < _visible.Count) await InvokeRowAsync(_visible[_active]);
+                break;
+            case "Escape":
+                await CloseAsync();
+                break;
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        _debounce?.Cancel();
+        Open = false;
+        _query = "";
+        _nodeRows = new();
+        _active = 0;
+        Recompute();
+        await OpenChanged.InvokeAsync(false);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open && _focusPending)
+        {
+            _focusPending = false;
+            try { await _input.FocusAsync(); }
+            catch { /* element may not be ready/attached yet; ignore */ }
+        }
+    }
+}

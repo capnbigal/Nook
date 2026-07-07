@@ -80,3 +80,100 @@
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-fast: 0ms; --motion-base: 0ms; --motion-slow: 0ms; }
 }
+
+/* Command palette (⌘K) overlay — token-driven so dark mode follows [data-theme]. */
+.nook-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(20, 17, 12, 0.45);
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+}
+
+.nook-palette {
+  width: 100%;
+  max-width: 640px;
+  max-height: 60vh;
+  height: fit-content;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(20, 17, 12, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nook-palette-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: var(--space-4) var(--space-5);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.nook-palette-input::placeholder {
+  color: var(--ink);
+  opacity: 0.5;
+}
+
+.nook-palette-list {
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+
+.nook-palette-section {
+  padding: var(--space-2) var(--space-5) var(--space-1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.55;
+}
+
+.nook-palette-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  cursor: pointer;
+  color: var(--ink);
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.nook-palette-row.is-active {
+  background: color-mix(in srgb, var(--brand-iris) 14%, var(--card));
+}
+
+.nook-palette-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nook-palette-row kbd {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  opacity: 0.6;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.nook-palette-empty {
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink);
+  opacity: 0.55;
+  font-size: 0.9rem;
+}
