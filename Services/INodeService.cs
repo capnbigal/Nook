@@ -13,6 +13,8 @@ public interface INodeService
     Task<Node> CreateAsync(Node node, IEnumerable<int>? tagIds = null);
     Task<Node> QuickCaptureAsync(string title, string? body = null);
     Task UpdateAsync(Node node, IEnumerable<int>? tagIds = null);
+    /// <summary>Persist only the Body (and UpdatedAt) of an owned node. Never touches tags/relations/kind/state.</summary>
+    Task SaveBodyAsync(int nodeId, string? body, CancellationToken ct = default);
     Task PromoteAsync(int id, NodeKind kind);
     Task SetStateAsync(int id, NodeState state);
     Task ArchiveAsync(int id);

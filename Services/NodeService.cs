@@ -137,6 +137,17 @@ public sealed class NodeService : INodeService
         await _activity.LogNodeAsync(userId, ActivityType.Updated, existing.NodeId, existing.Title);
     }
 
+    public async Task SaveBodyAsync(int nodeId, string? body, CancellationToken ct = default)
+    {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var node = await db.Nodes.FirstOrDefaultAsync(n => n.NodeId == nodeId && n.UserId == userId, ct);
+        if (node is null) return;
+        node.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+        node.UpdatedAt = DateTime.UtcNow; // ApplyTimestamps also bumps this on Modified
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task PromoteAsync(int id, NodeKind kind)
     {
         var userId = await _currentUser.GetRequiredUserIdAsync();
