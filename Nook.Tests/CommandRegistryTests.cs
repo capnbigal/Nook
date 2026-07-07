@@ -47,10 +47,37 @@ public class CommandRegistryTests
     [Fact]
     public void RanksExactPrefixFirst()
     {
-        // "new" is a prefix of "New Note"/"New Project"; a subsequence-only hit must rank lower
-        var all = new List<Command> { C("Rename Node"), C("New Note") };
+        // "new" is a genuine prefix match of "New Note". "Node Workspace" is NOT a prefix and NOT a
+        // contiguous substring match for "new" — it only matches via subsequence (N..e..w, non-contiguous:
+        // "Node Workspace" -> N(0) ... e(3) ... W(5)) — so it's a real competing lower-ranked candidate.
+        var all = new List<Command> { C("Node Workspace"), C("New Note") };
         var hits = CommandRegistry.Match("new", all).Select(c => c.Label).ToList();
-        Assert.Equal("New Note", hits[0]); // prefix beats subsequence-in-"reName"
+        Assert.Equal(new[] { "New Note", "Node Workspace" }, hits); // prefix beats subsequence
+    }
+
+    [Fact]
+    public void RanksPrefixBeforeContainsBeforeSubsequence()
+    {
+        // Three candidates that all genuinely match query "ca" via a DIFFERENT tier each:
+        //   "Cancel"        -> StartsWith "ca"                         => tier 0 (prefix)
+        //   "Scan All"      -> contains "ca" ("sCAn"), not a prefix    => tier 1 (contiguous substring)
+        //   "Create Action" -> "ca" only as C..a subsequence (C-r-e-A-t-e...), not contiguous, not prefix
+        //                                                               => tier 2 (subsequence)
+        var all = new List<Command> { C("Create Action"), C("Scan All"), C("Cancel") };
+        var hits = CommandRegistry.Match("ca", all).Select(c => c.Label).ToList();
+        Assert.Equal(new[] { "Cancel", "Scan All", "Create Action" }, hits);
+    }
+
+    [Fact]
+    public void ContainsMatch_RanksAfterPrefixMatch_ForSameQuery()
+    {
+        // Focused tier-1 proof: "Ignore Warnings" matches query "no" only via Contains
+        // (Ignore -> "Ig-NO-re"), never via StartsWith. "Note" matches the same query via StartsWith.
+        // Both must be returned, with the prefix match ranked first.
+        var all = new List<Command> { C("Ignore Warnings"), C("Note") };
+        var hits = CommandRegistry.Match("no", all).Select(c => c.Label).ToList();
+        Assert.Contains("Ignore Warnings", hits);
+        Assert.Equal(new[] { "Note", "Ignore Warnings" }, hits);
     }
 
     [Fact]
