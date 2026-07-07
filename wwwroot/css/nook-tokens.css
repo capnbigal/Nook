@@ -1,7 +1,33 @@
-/* @font-face rules injected by fonts task */
+/* Self-hosted brand fonts (variable weight axis). Files live in wwwroot/fonts/. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('../fonts/BricolageGrotesque-Variable.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/Figtree-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrainsMono-Variable.woff2') format('woff2');
+  font-weight: 100 800;
+  font-display: swap;
+  font-style: normal;
+}
 
 /* nook-tokens.css — design-token layer. Loaded AFTER MudBlazor so it wins. */
 :root {
+  /* Fonts */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Figtree', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
   /* Brand */
   --brand-iris: #5B54E8;
   --brand-tangerine: #F98A3C;
