@@ -70,6 +70,23 @@ public class WikiLinkServiceTests
     }
 
     [Fact]
+    public async Task ResolveOrCreate_matches_existing_title_case_insensitively()
+    {
+        var h = new GraphHarness();
+        var nodes = h.Nodes("u");
+        var exact = await nodes.CreateAsync(new Node { Title = "Meeting", State = NodeState.Active });
+        var countBefore = (await nodes.QueryAsync(new NodeFilter { Take = 1000 })).Count;
+
+        var (id, url) = await Svc(h, "u").ResolveOrCreateAsync("meeting");
+
+        Assert.Equal(exact.NodeId, id);
+        Assert.Equal($"/nodes/{exact.NodeId}", url);
+
+        var countAfter = (await nodes.QueryAsync(new NodeFilter { Take = 1000 })).Count;
+        Assert.Equal(countBefore, countAfter); // no duplicate node created for differing case
+    }
+
+    [Fact]
     public async Task ResolveOrCreate_returns_sentinel_for_blank_title_and_creates_nothing()
     {
         var h = new GraphHarness();

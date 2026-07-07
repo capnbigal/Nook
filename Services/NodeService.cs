@@ -84,8 +84,13 @@ public sealed class NodeService : INodeService
     {
         var userId = await _currentUser.GetRequiredUserIdAsync();
         await using var db = await _factory.CreateDbContextAsync(ct);
+        // .ToLower() (not ToLowerInvariant/string.Equals) so this translates to SQL Server's
+        // LOWER() and stays deterministically case-insensitive across both providers — SQL
+        // Server's default collation is already case-insensitive, but EF InMemory (tests) does
+        // an ordinal case-sensitive ==, so without this the two providers disagree.
+        var lowered = (title ?? string.Empty).ToLower();
         return await db.Nodes
-            .Where(n => n.UserId == userId && n.Title == title)
+            .Where(n => n.UserId == userId && n.Title.ToLower() == lowered)
             .OrderByDescending(n => n.UpdatedAt)
             .FirstOrDefaultAsync(ct);
     }
