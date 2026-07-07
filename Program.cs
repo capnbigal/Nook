@@ -75,6 +75,7 @@ builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<ICryptexService, CryptexService>();
 builder.Services.AddScoped<IGraphMigrationService, GraphMigrationService>();
 builder.Services.AddScoped<IUserPreferenceService, UserPreferenceService>();
+builder.Services.AddScoped<IWikiLinkService, WikiLinkService>();
 
 // Insights.
 builder.Services.AddScoped<ITimelineService, TimelineService>();

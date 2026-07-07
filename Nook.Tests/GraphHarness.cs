@@ -28,4 +28,6 @@ public sealed class GraphHarness
         Nodes(userId), Tags(userId), Collections(userId), Relations(userId));
 
     public UserPreferenceService Prefs(string userId) => new(Factory, new FakeCurrentUser(userId));
+
+    public WikiLinkService WikiLinks(string userId) => new(Nodes(userId), Relations(userId));
 }
