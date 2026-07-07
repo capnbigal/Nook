@@ -1,0 +1,19 @@
+@* Node-page header. The <h1> is a STATIC, non-editable focus target — Routes.razor's
+   <FocusOnNavigate Selector="h1" /> must land here, not inside the contenteditable
+   InlineTitleEditor nested within it. *@
+
+<header class="node-header">
+    <div class="node-header__meta">
+        <ObjectTypeBadge Kind="Node.Kind" />
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                 Color="@NodeUi.StateColor(Node.State)">@NodeUi.StateLabel(Node.State)</MudChip>
+    </div>
+    <h1 class="node-header__title" tabindex="-1">
+        <InlineTitleEditor NodeId="Node.NodeId" Title="@Node.Title" TitleChanged="OnTitleChanged" />
+    </h1>
+</header>
+
+@code {
+    [Parameter, EditorRequired] public Node Node { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnTitleChanged { get; set; }
+}

@@ -1,0 +1,25 @@
+.node-header {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin-bottom: 1rem;
+}
+
+.node-header__meta {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.node-header__title {
+    font: 600 clamp(1.6rem, 3vw, 2.2rem) / 1.15 var(--font-display, inherit);
+    margin: .25rem 0 0;
+    outline: none;
+}
+
+/* h1 itself is not editable — focus ring belongs to the nested contenteditable
+   (see InlineTitleEditor.razor.css), so suppress any default ring here. */
+.node-header__title:focus-visible {
+    outline: none;
+}
