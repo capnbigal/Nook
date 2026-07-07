@@ -1,0 +1,40 @@
+.nook-shell {
+    display: grid;
+    grid-template-columns: 56px var(--sidebar-w, 260px) 1fr;
+    grid-template-rows: 100vh;
+    background: var(--canvas, #F7F5F0);
+    color: var(--ink, #262119);
+}
+
+.nook-shell.sidebar-collapsed {
+    grid-template-columns: 56px 0 1fr;
+}
+
+.nook-rail {
+    grid-column: 1;
+    border-right: 1px solid var(--line, #E9E4D9);
+}
+
+.nook-sidebar {
+    grid-column: 2;
+    overflow-y: auto;
+    border-right: 1px solid var(--line, #E9E4D9);
+}
+
+.nook-main {
+    grid-column: 3;
+    display: grid;
+    grid-template-rows: 52px 1fr;
+    min-width: 0;
+}
+
+.nook-topbar {
+    grid-row: 1;
+    border-bottom: 1px solid var(--line, #E9E4D9);
+}
+
+.nook-content {
+    grid-row: 2;
+    overflow-y: auto;
+    padding: var(--space-5, 24px);
+}

@@ -1,0 +1,106 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@inject ThemeState Theme
+@inject WorkspaceState Workspace
+@inject IJSRuntime JS
+
+<MudThemeProvider Theme="_theme" IsDarkMode="Theme.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<CascadingValue Value="Workspace">
+    <div class="nook-shell">
+        <div class="nook-rail"></div>
+        <div class="nook-sidebar"></div>
+        <div class="nook-main">
+            <div class="nook-topbar"></div>
+            <main class="nook-content">@Body</main>
+        </div>
+    </div>
+</CascadingValue>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    // Task 15/16 replace the placeholder divs above (.nook-rail -> <GlobalRail/>,
+    // .nook-sidebar -> <WorkspaceSidebar/>, .nook-topbar -> <TopBar/>). Task 19 adds
+    // <CommandPalette/> inside the CascadingValue and wires OpenPalette + mod+k.
+    private readonly MudTheme _theme = NookTheme.Build();
+    private IJSObjectReference? _shortcutsModule;
+    private IJSObjectReference? _themeModule;
+    private DotNetObjectReference<WorkspaceShell>? _dotNetRef;
+
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Theme.InitializeAsync();
+        await Workspace.InitializeAsync();
+        Theme.Changed += OnStateChanged;
+        Workspace.Changed += OnStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        _shortcutsModule = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./Components/Layout/WorkspaceShell.razor.js");
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await _shortcutsModule.InvokeVoidAsync("initialize", _dotNetRef);
+
+        // Initial theme paint via the real theme-interop module (Task 12/13 contract);
+        // ThemeState.SetAsync drives subsequent toggles.
+        _themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/theme-interop.js");
+        await _themeModule.InvokeVoidAsync("setTheme", Theme.IsDarkMode ? "dark" : null);
+    }
+
+    [JSInvokable]
+    public Task OnShortcutAsync(string combo)
+    {
+        switch (combo)
+        {
+            case "g h":
+                Nav.NavigateTo("/today");
+                break;
+            case "g i":
+                Nav.NavigateTo("/inbox");
+                break;
+            case "mod+k":
+                // Task 19 wires the command palette
+                break;
+        }
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    public async ValueTask DisposeAsync()
+    {
+        Theme.Changed -= OnStateChanged;
+        Workspace.Changed -= OnStateChanged;
+
+        if (_shortcutsModule is not null)
+        {
+            try
+            {
+                await _shortcutsModule.InvokeVoidAsync("dispose");
+                await _shortcutsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
+        }
+
+        if (_themeModule is not null)
+        {
+            try { await _themeModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}
