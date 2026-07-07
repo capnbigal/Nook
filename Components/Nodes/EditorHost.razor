@@ -1,0 +1,98 @@
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using Microsoft.JSInterop
+@using Nook.Models
+@inject IJSRuntime JS
+@inject INodeService Nodes
+@inject IWikiLinkService WikiLinks
+@inject IActionService Actions
+
+<div @ref="_el" class="nook-editor"></div>
+
+@code {
+    [Parameter, EditorRequired] public int NodeId { get; set; }
+    [Parameter] public string? InitialBody { get; set; }
+
+    private ElementReference _el;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<EditorHost>? _ref;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+        _ref = DotNetObjectReference.Create(this);
+        _module = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./Components/Nodes/EditorHost.razor.js");
+        await _module.InvokeVoidAsync("initialize", _el, _ref, InitialBody ?? "",
+            new { debounceMs = 800 });
+    }
+
+    // Editor owns its DOM/state after init — never let Blazor re-render over it.
+    protected override bool ShouldRender() => !_initialized;
+
+    [JSInvokable]
+    public async Task SaveBodyAsync(string markdown)
+    {
+        await Nodes.SaveBodyAsync(NodeId, markdown);
+        var titles = ExtractWikiTitles(markdown);
+        await WikiLinks.ReconcileAsync(NodeId, titles);
+    }
+
+    [JSInvokable]
+    public async Task<string> SearchNodesAsync(string query)
+    {
+        var results = await Nodes.QueryAsync(new NodeFilter { SearchText = query, Take = 8 });
+        var dto = results.Select(n => new { id = n.NodeId, title = n.Title, kind = n.Kind.ToString() });
+        return JsonSerializer.Serialize(dto);
+    }
+
+    [JSInvokable]
+    public async Task<string> ResolveOrCreateLinkAsync(string title)
+    {
+        var (id, url) = await WikiLinks.ResolveOrCreateAsync(title);
+        return JsonSerializer.Serialize(new { id, url });
+    }
+
+    [JSInvokable]
+    public Task ToggleActionAsync(int id, bool done) =>
+        done ? Actions.CompleteAsync(id) : Actions.ReopenAsync(id);
+
+    [JSInvokable]
+    public async Task<int> CreateActionAsync(string text)
+    {
+        var created = await Actions.CreateAsync(new ActionItem
+        {
+            Title = text,
+            Kind = ActionKind.Task,
+            TargetNodeId = NodeId
+        });
+        return created.ActionItemId;
+    }
+
+    private static IReadOnlyCollection<string> ExtractWikiTitles(string markdown)
+    {
+        var titles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match m in Regex.Matches(markdown, @"\[\[([^\]]+)\]\]"))
+            titles.Add(m.Groups[1].Value.Trim());
+        return titles;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("flush");   // persist any pending debounce
+                await _module.InvokeVoidAsync("dispose");
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        _ref?.Dispose();
+    }
+}
