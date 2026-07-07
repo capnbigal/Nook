@@ -77,6 +77,10 @@ builder.Services.AddScoped<IGraphMigrationService, GraphMigrationService>();
 builder.Services.AddScoped<IUserPreferenceService, UserPreferenceService>();
 builder.Services.AddScoped<IWikiLinkService, WikiLinkService>();
 
+// Workspace shell UI state (recents/breadcrumb + dark-mode), cascaded from WorkspaceShell.
+builder.Services.AddScoped<WorkspaceState>();
+builder.Services.AddScoped<ThemeState>();
+
 // Insights.
 builder.Services.AddScoped<ITimelineService, TimelineService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
