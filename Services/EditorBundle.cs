@@ -17,5 +17,5 @@ namespace Nook.Services;
 /// </summary>
 public static class EditorBundle
 {
-    public const string Url = "/lib/editor/nook-editor.JKW3RB33.js";
+    public const string Url = "/lib/editor/nook-editor.UC55PDUU.js";
 }

@@ -8,6 +8,7 @@
 @inject INodeService Nodes
 @inject IWikiLinkService WikiLinks
 @inject IActionService Actions
+@inject NavigationManager Nav
 
 <div @ref="_el" class="nook-editor"></div>
 
@@ -55,6 +56,17 @@
     {
         var (id, url) = await WikiLinks.ResolveOrCreateAsync(title);
         return JsonSerializer.Serialize(new { id, url });
+    }
+
+    // Ctrl/Cmd-click on a [[wiki-link]] chip: resolve the title (creating the
+    // node if it doesn't exist yet) and navigate to it. A different node id
+    // remounts this EditorHost (NodePage @key), whose DisposeAsync flushes any
+    // pending body edit first, so no in-flight edit is lost.
+    [JSInvokable]
+    public async Task OpenLinkAsync(string title)
+    {
+        var (_, url) = await WikiLinks.ResolveOrCreateAsync(title);
+        Nav.NavigateTo(url);
     }
 
     [JSInvokable]

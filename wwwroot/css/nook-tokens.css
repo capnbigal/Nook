@@ -294,3 +294,16 @@
 .nook-wikimenu__row.is-active {
   background: color-mix(in srgb, var(--brand-iris) 14%, var(--card));
 }
+
+/* [[wiki-link]] chips (ProseMirror inline decoration over plain [[Title]] text) */
+.nook-editor .ProseMirror .nook-wikilink {
+  color: var(--brand-iris);
+  background: color-mix(in srgb, var(--brand-iris) 10%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.nook-editor .ProseMirror .nook-wikilink:hover {
+  background: color-mix(in srgb, var(--brand-iris) 18%, transparent);
+}

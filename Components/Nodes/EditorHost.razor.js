@@ -30,6 +30,7 @@ export async function initialize(el, ref, initialMarkdown, opts) {
             NookEditor.TaskList,
             NookEditor.TaskItem.configure({ nested: true }),
             NookEditor.Markdown, // serialize/deserialize markdown
+            wikiLinkDecoration(NookEditor), // render [[Title]] as clickable chips
         ],
         content: initialMarkdown, // parsed as markdown by the Markdown extension
         onUpdate: () => {
@@ -44,6 +45,66 @@ export async function initialize(el, ref, initialMarkdown, opts) {
     // Intercept nav keys BEFORE ProseMirror when the wiki menu is open (capture phase).
     keydownHandler = onWikiKeyDown;
     editor.view.dom.addEventListener("keydown", keydownHandler, true);
+}
+
+// Renders existing [[Title]] ranges as clickable chips using ProseMirror
+// decorations. The document text stays plain [[Title]] (markdown + save-time
+// reconcile untouched); this is purely a visual/interaction overlay.
+// Ctrl/Cmd-click opens the node (plain click keeps the caret for editing).
+function wikiLinkDecoration(NookEditor) {
+    const WIKI = /\[\[([^\]\n]+)\]\]/g;
+    const key = new NookEditor.PluginKey("nookWikiLink");
+
+    function build(doc) {
+        const decos = [];
+        doc.descendants((node, pos) => {
+            if (!node.isText || !node.text) return;
+            WIKI.lastIndex = 0;
+            let m;
+            while ((m = WIKI.exec(node.text)) !== null) {
+                const from = pos + m.index;
+                const to = from + m[0].length;
+                decos.push(NookEditor.Decoration.inline(from, to, {
+                    class: "nook-wikilink",
+                    "data-wikititle": m[1].trim(),
+                    title: "Ctrl/Cmd-click to open",
+                }));
+            }
+        });
+        return NookEditor.DecorationSet.create(doc, decos);
+    }
+
+    return NookEditor.Extension.create({
+        name: "nookWikiLink",
+        addProseMirrorPlugins() {
+            return [
+                new NookEditor.Plugin({
+                    key,
+                    state: {
+                        init: (_, { doc }) => build(doc),
+                        apply: (tr, old) => (tr.docChanged ? build(tr.doc) : old),
+                    },
+                    props: {
+                        decorations(state) { return key.getState(state); },
+                        handleClick: (view, pos, event) => {
+                            if (!(event.metaKey || event.ctrlKey)) return false;
+                            const link = event.target && event.target.closest
+                                ? event.target.closest(".nook-wikilink")
+                                : null;
+                            if (link && dotNetRef) {
+                                const title = link.getAttribute("data-wikititle");
+                                if (title) {
+                                    dotNetRef.invokeMethodAsync("OpenLinkAsync", title);
+                                    return true;
+                                }
+                            }
+                            return false;
+                        },
+                    },
+                }),
+            ];
+        },
+    });
 }
 
 function currentMarkdown() {
