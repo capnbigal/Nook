@@ -15,16 +15,21 @@
 @code {
     [Parameter, EditorRequired] public int NodeId { get; set; }
     [Parameter] public string? InitialBody { get; set; }
+    // Raised after a save in which the set of [[wiki-links]] changed, so the
+    // host page can refresh its connections/backlinks without a manual reload.
+    [Parameter] public EventCallback OnLinksChanged { get; set; }
 
     private ElementReference _el;
     private IJSObjectReference? _module;
     private DotNetObjectReference<EditorHost>? _ref;
     private bool _initialized;
+    private HashSet<string> _lastTitles = new(StringComparer.OrdinalIgnoreCase);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || _initialized) return;
         _initialized = true;
+        _lastTitles = new HashSet<string>(ExtractWikiTitles(InitialBody ?? ""), StringComparer.OrdinalIgnoreCase);
         _ref = DotNetObjectReference.Create(this);
         _module = await JS.InvokeAsync<IJSObjectReference>(
             "import", "./Components/Nodes/EditorHost.razor.js");
@@ -39,8 +44,15 @@
     public async Task SaveBodyAsync(string markdown)
     {
         await Nodes.SaveBodyAsync(NodeId, markdown);
-        var titles = ExtractWikiTitles(markdown);
+        var titles = new HashSet<string>(ExtractWikiTitles(markdown), StringComparer.OrdinalIgnoreCase);
         await WikiLinks.ReconcileAsync(NodeId, titles);
+        // If the set of [[links]] changed, refresh the page's connections/backlinks.
+        if (!titles.SetEquals(_lastTitles))
+        {
+            _lastTitles = titles;
+            if (OnLinksChanged.HasDelegate)
+                await OnLinksChanged.InvokeAsync();
+        }
     }
 
     [JSInvokable]

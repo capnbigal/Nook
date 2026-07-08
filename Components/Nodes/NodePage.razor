@@ -19,7 +19,8 @@ else
     <div class="node-page">
         <div class="node-page__main" @key="_node.NodeId">
             <NodeHeader Node="_node" OnTitleChanged="OnTitleChanged" />
-            <EditorHost @key="_node.NodeId" NodeId="_node.NodeId" InitialBody="@(_node.Body ?? string.Empty)" />
+            <EditorHost @key="_node.NodeId" NodeId="_node.NodeId" InitialBody="@(_node.Body ?? string.Empty)"
+                        OnLinksChanged="ReloadAsync" />
             <BacklinksPanel NodeId="_node.NodeId" RefreshToken="_refresh" />
             <ActivityStrip NodeId="_node.NodeId" UserId="@_node.UserId" RefreshToken="_refresh" />
         </div>
