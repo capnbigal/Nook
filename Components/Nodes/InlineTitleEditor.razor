@@ -1,0 +1,126 @@
+@* Contenteditable node title. Commits on blur and on Enter (Enter never inserts a
+   newline — see InlineTitleEditor.razor.js). Reads the live DOM text via a tiny
+   collocated JS module rather than @oninput/ChangeEventArgs.Value, which is
+   unreliable for contenteditable innerText in Blazor. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject INodeService NodeService
+
+<div class="ite">
+    <div class="ite__field" contenteditable="true" role="textbox" aria-label="Node title"
+         @ref="_el" @onblur="CommitAsync">@_current</div>
+    @if (_state == SaveState.Saving)
+    {
+        <span class="ite__save">Saving…</span>
+    }
+    else if (_state == SaveState.Saved)
+    {
+        <span class="ite__save ite__save--ok">Saved</span>
+    }
+</div>
+
+@code {
+    [Parameter] public int NodeId { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback<string> TitleChanged { get; set; }
+
+    private enum SaveState { Idle, Saving, Saved }
+
+    private ElementReference _el;
+    private IJSObjectReference? _module;
+    private bool _jsInitialized;
+    private bool _committing;
+    private string _current = "";
+    private string _committed = "";
+    private SaveState _state = SaveState.Idle;
+
+    protected override void OnParametersSet()
+    {
+        // Re-sync only when the title changes from the outside (e.g. parent reload).
+        // Blur owns the commit mid-edit, so this must never fire while the user is typing.
+        _current = Title;
+        _committed = Title;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _jsInitialized) return;
+        _jsInitialized = true;
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./Components/Nodes/InlineTitleEditor.razor.js");
+            await _module.InvokeVoidAsync("initialize", _el);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit torn down before init landed; nothing to wire up.
+        }
+    }
+
+    private async Task CommitAsync(FocusEventArgs _)
+    {
+        if (_committing || _module is null) return;
+        _committing = true;
+        try
+        {
+            var live = await _module.InvokeAsync<string>("readText", _el);
+            var trimmed = (live ?? "").Trim();
+
+            if (trimmed.Length == 0)
+            {
+                // Never persist an empty title — revert to the last committed value.
+                _current = _committed;
+                _state = SaveState.Idle;
+                StateHasChanged();
+                return;
+            }
+
+            // Keep the DOM's rendered text in sync with what the user typed *before* any
+            // further re-render, so the upcoming "Saving…" StateHasChanged() doesn't
+            // flicker the field back to the stale pre-edit title.
+            _current = trimmed;
+
+            if (trimmed == _committed)
+            {
+                return; // unchanged — no-op, no save
+            }
+
+            _state = SaveState.Saving;
+            StateHasChanged();
+
+            var node = await NodeService.GetByIdAsync(NodeId);
+            if (node is not null)
+            {
+                node.Title = trimmed;
+                // tagIds: null tells NodeService.UpdateAsync to leave NodeTags untouched —
+                // the non-destructive path for a title-only rename (see NodeService.cs:141).
+                await NodeService.UpdateAsync(node, null);
+                _committed = node.Title;
+                _current = _committed;
+                await TitleChanged.InvokeAsync(_committed);
+            }
+
+            _state = SaveState.Saved;
+            StateHasChanged();
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit is tearing down; nothing left to persist to.
+        }
+        finally
+        {
+            _committing = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+                await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+    }
+}

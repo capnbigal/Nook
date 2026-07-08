@@ -39,6 +39,7 @@ public class NookContext : IdentityDbContext<ApplicationUser>
     public DbSet<EventDetails> EventDetails => Set<EventDetails>();
     public DbSet<EventParticipant> EventParticipants => Set<EventParticipant>();
     public DbSet<MigrationAudit> MigrationAudits => Set<MigrationAudit>();
+    public DbSet<UserPreference> UserPreferences => Set<UserPreference>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -306,6 +307,17 @@ public class NookContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.Detail).HasMaxLength(1000);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("sysutcdatetime()");
             entity.HasIndex(e => e.Category);
+        });
+
+        modelBuilder.Entity<UserPreference>(entity =>
+        {
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.RecentNodeIdsCsv).HasMaxLength(200);
+            entity.HasIndex(e => e.UserId).IsUnique();
+            // FK to the identity user, Restrict per house style.
+            entity.HasOne<ApplicationUser>().WithMany()
+                  .HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
+            // LastOpenedNodeId is denormalised — deliberately NO FK.
         });
     }
 

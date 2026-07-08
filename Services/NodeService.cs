@@ -60,10 +60,13 @@ public sealed class NodeService : INodeService
                 n.NodeTags.Any(nt => nt.Tag.Name.Contains(s)));
         }
 
-        return await query
+        query = query
             .OrderByDescending(n => n.IsPinned)
-            .ThenByDescending(n => n.UpdatedAt)
-            .ToListAsync();
+            .ThenByDescending(n => n.UpdatedAt);
+
+        if (filter.Take is int t) query = query.Take(t);
+
+        return await query.ToListAsync();
     }
 
     public async Task<Node?> GetByIdAsync(int id)
@@ -75,6 +78,21 @@ public sealed class NodeService : INodeService
             .Include(n => n.Collection)
             .Include(n => n.EventDetails)
             .FirstOrDefaultAsync(n => n.NodeId == id && n.UserId == userId);
+    }
+
+    public async Task<Node?> FindByExactTitleAsync(string title, CancellationToken ct = default)
+    {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        // .ToLower() (not ToLowerInvariant/string.Equals) so this translates to SQL Server's
+        // LOWER() and stays deterministically case-insensitive across both providers — SQL
+        // Server's default collation is already case-insensitive, but EF InMemory (tests) does
+        // an ordinal case-sensitive ==, so without this the two providers disagree.
+        var lowered = (title ?? string.Empty).ToLower();
+        return await db.Nodes
+            .Where(n => n.UserId == userId && n.Title.ToLower() == lowered)
+            .OrderByDescending(n => n.UpdatedAt)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<Node> CreateAsync(Node node, IEnumerable<int>? tagIds = null)
@@ -132,6 +150,17 @@ public sealed class NodeService : INodeService
 
         await db.SaveChangesAsync();
         await _activity.LogNodeAsync(userId, ActivityType.Updated, existing.NodeId, existing.Title);
+    }
+
+    public async Task SaveBodyAsync(int nodeId, string? body, CancellationToken ct = default)
+    {
+        var userId = await _currentUser.GetRequiredUserIdAsync();
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var node = await db.Nodes.FirstOrDefaultAsync(n => n.NodeId == nodeId && n.UserId == userId, ct);
+        if (node is null) return;
+        node.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+        node.UpdatedAt = DateTime.UtcNow; // ApplyTimestamps also bumps this on Modified
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task PromoteAsync(int id, NodeKind kind)

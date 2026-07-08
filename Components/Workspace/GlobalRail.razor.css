@@ -1,0 +1,16 @@
+.nook-rail-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+    padding: 8px 0;
+    box-sizing: border-box;
+}
+
+.rail-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}

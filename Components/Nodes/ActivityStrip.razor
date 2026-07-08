@@ -1,0 +1,69 @@
+@* Read-only, time-ordered strip merging this node's activity-log entries with the
+   events that reference it. Known pre-existing quirk: EventService.GetEventsForNodeAsync
+   can return event nodes whose EventDetails navigation is null (Include dropped by
+   projection elsewhere in the service) — handled below with ?. so a null OccurredAt
+   just sorts last instead of throwing. Not fixed here; EventService is out of scope. *@
+@inject IActivityService ActivityService
+@inject IEventService EventService
+
+<section class="activity-strip">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Activity</MudText>
+    @if (_rows.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No activity yet.</MudText>
+    }
+    else
+    {
+        @foreach (var row in _rows)
+        {
+            <div class="activity-strip__row">
+                <MudIcon Icon="@row.Icon" Size="Size.Small" Class="mud-text-secondary" />
+                <span class="activity-strip__when mud-text-secondary">@NodeUi.Format(row.When)</span>
+                <span class="activity-strip__text">@row.Text</span>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int NodeId { get; set; }
+    [Parameter, EditorRequired] public string UserId { get; set; } = "";
+    [Parameter] public int Take { get; set; } = 12;
+    [Parameter] public int? RefreshToken { get; set; }
+
+    private sealed record Row(DateTime? When, string Text, string Icon);
+
+    private List<Row> _rows = new();
+    private int _loadedFor = -1;
+    private string? _loadedUser;
+    private int _loadedTake = -1;
+    private int? _loadedToken;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor == NodeId && _loadedUser == UserId && _loadedTake == Take && _loadedToken == RefreshToken) return;
+
+        var logs = await ActivityService.GetForNodeAsync(UserId, NodeId, Take);
+        var events = await EventService.GetEventsForNodeAsync(NodeId);
+
+        var logRows = logs.Select(l => new Row(
+            l.Timestamp,
+            l.Detail is null ? l.Type.ToString() : $"{l.Type} ({l.Detail})",
+            Icons.Material.Filled.History));
+
+        var eventRows = events.Select(e => new Row(
+            e.EventDetails?.OccurredAt,
+            $"Referenced by event: {e.Title}",
+            Icons.Material.Filled.Event));
+
+        _rows = logRows.Concat(eventRows)
+            .OrderByDescending(r => r.When)
+            .Take(Take)
+            .ToList();
+
+        _loadedFor = NodeId;
+        _loadedUser = UserId;
+        _loadedTake = Take;
+        _loadedToken = RefreshToken;
+    }
+}

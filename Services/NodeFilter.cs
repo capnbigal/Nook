@@ -29,6 +29,9 @@ public class NodeFilter
     /// </summary>
     public bool UnassignedOnly { get; set; }
 
+    /// <summary>Cap the number of results (applied after ordering). null = unbounded.</summary>
+    public int? Take { get; set; }
+
     /// <summary>The record kinds surfaced by the "Notes &amp; Records" view.</summary>
     public static readonly IReadOnlyCollection<NodeKind> RecordKinds = new[]
     {

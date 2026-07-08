@@ -1,0 +1,309 @@
+/* Self-hosted brand fonts (variable weight axis). Files live in wwwroot/fonts/. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  src: url('../fonts/BricolageGrotesque-Variable.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/Figtree-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrainsMono-Variable.woff2') format('woff2');
+  font-weight: 100 800;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* nook-tokens.css — design-token layer. Loaded AFTER MudBlazor so it wins. */
+:root {
+  /* Fonts */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Figtree', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Brand */
+  --brand-iris: #5B54E8;
+  --brand-tangerine: #F98A3C;
+
+  /* Surfaces — Sand light (default) */
+  --canvas: #F7F5F0;
+  --card: #FFFFFF;
+  --surface: #FFFFFF;
+  --ink: #262119;
+  --line: #E9E4D9;
+
+  /* Kind accents (order matches Models/GraphEnums.cs NodeKind) */
+  --kind-unclassified: #8C8578;
+  --kind-note: #4C7DF0;
+  --kind-journal: #E0863C;
+  --kind-observation: #14B8A6;
+  --kind-idea: #F5B417;
+  --kind-reference: #5878A6;
+  --kind-bookmark: #F2416A;
+  --kind-list: #23A968;
+  --kind-person: #F76F5A;
+  --kind-project: #7C5CFF;
+  --kind-place: #A15C34;
+  --kind-organization: #A24C8C;
+  --kind-topic: #17B0C4;
+  --kind-resource: #7E9C24;
+  --kind-collection: #B78430;
+  --kind-event: #EE5D9A;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+
+  /* Radius */
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+
+  /* Motion */
+  --motion-fast: 120ms; --motion-base: 200ms; --motion-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-theme="dark"] {
+  --canvas: #16130E;
+  --card: #201C15;
+  --surface: #201C15;
+  --ink: #F3EEE4;
+  --line: #2C271E;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion-base: 0ms; --motion-slow: 0ms; }
+}
+
+/* Command palette (⌘K) overlay — token-driven so dark mode follows [data-theme]. */
+.nook-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(20, 17, 12, 0.45);
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+}
+
+.nook-palette {
+  width: 100%;
+  max-width: 640px;
+  max-height: 60vh;
+  height: fit-content;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(20, 17, 12, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nook-palette-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: var(--space-4) var(--space-5);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.nook-palette-input::placeholder {
+  color: var(--ink);
+  opacity: 0.5;
+}
+
+.nook-palette-list {
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+
+.nook-palette-section {
+  padding: var(--space-2) var(--space-5) var(--space-1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.55;
+}
+
+.nook-palette-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  cursor: pointer;
+  color: var(--ink);
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.nook-palette-row.is-active {
+  background: color-mix(in srgb, var(--brand-iris) 14%, var(--card));
+}
+
+.nook-palette-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nook-palette-row kbd {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  opacity: 0.6;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.nook-palette-empty {
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink);
+  opacity: 0.55;
+  font-size: 0.9rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Node editor (TipTap / ProseMirror). MUST be global, not scoped: the
+   .ProseMirror DOM is created by the editor JS at runtime, outside Blazor's
+   CSS-isolation tree, so a .razor.css would never match it.
+   --------------------------------------------------------------------------- */
+.nook-editor {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+.nook-editor .ProseMirror {
+  min-height: 320px;
+  padding: var(--space-6);
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--ink);
+  caret-color: var(--brand-iris);
+}
+.nook-editor .ProseMirror > * + * { margin-top: 0.75em; }
+.nook-editor .ProseMirror p { margin: 0; }
+.nook-editor .ProseMirror h1,
+.nook-editor .ProseMirror h2,
+.nook-editor .ProseMirror h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 1.4em 0 0.4em;
+}
+.nook-editor .ProseMirror h1 { font-size: 1.7rem; }
+.nook-editor .ProseMirror h2 { font-size: 1.4rem; }
+.nook-editor .ProseMirror h3 { font-size: 1.18rem; }
+.nook-editor .ProseMirror ul,
+.nook-editor .ProseMirror ol { padding-left: 1.4em; }
+.nook-editor .ProseMirror li { margin: 0.2em 0; }
+.nook-editor .ProseMirror blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: var(--space-4);
+  opacity: 0.85;
+  font-style: italic;
+}
+.nook-editor .ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+}
+.nook-editor .ProseMirror pre {
+  font-family: var(--font-mono);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  overflow-x: auto;
+}
+.nook-editor .ProseMirror pre code { background: none; padding: 0; }
+.nook-editor .ProseMirror a {
+  color: var(--brand-iris);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* Task list (TipTap TaskList/TaskItem) */
+.nook-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.nook-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.nook-editor .ProseMirror ul[data-type="taskList"] li > label {
+  margin-top: 0.15em;
+  user-select: none;
+}
+.nook-editor .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.nook-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: var(--success, #1E9E6A);
+  width: 1.05em;
+  height: 1.05em;
+  cursor: pointer;
+}
+
+/* [[wiki-link]] autocomplete dropdown (appended to <body> by the editor JS,
+   so it must be global). Positioned via position:fixed + caret coords. */
+.nook-wikimenu {
+  position: fixed;
+  z-index: 1400;
+  min-width: 220px;
+  max-width: 360px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(38, 33, 24, 0.18);
+  padding: 4px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+}
+.nook-wikimenu__row {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nook-wikimenu__row.is-active {
+  background: color-mix(in srgb, var(--brand-iris) 14%, var(--card));
+}
+
+/* [[wiki-link]] chips (ProseMirror inline decoration over plain [[Title]] text) */
+.nook-editor .ProseMirror .nook-wikilink {
+  color: var(--brand-iris);
+  background: color-mix(in srgb, var(--brand-iris) 10%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 0 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.nook-editor .ProseMirror .nook-wikilink:hover {
+  background: color-mix(in srgb, var(--brand-iris) 18%, transparent);
+}

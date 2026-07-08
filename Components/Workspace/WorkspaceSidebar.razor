@@ -1,0 +1,74 @@
+@implements IDisposable
+@using Nook.Models
+@using Nook.Services
+@inject INodeService Nodes
+@inject ICollectionService Collections
+
+<div class="@($"nook-sidebar-inner {Class}")">
+    <MudNavMenu>
+        <div class="nook-sb-heading">Favorites</div>
+        @foreach (var n in _favorites)
+        {
+            <SidebarNodeLink NodeId="n.NodeId" Title="@n.Title" Kind="n.Kind" />
+        }
+
+        <div class="nook-sb-heading">Pinned</div>
+        @foreach (var n in _pinned)
+        {
+            <SidebarNodeLink NodeId="n.NodeId" Title="@n.Title" Kind="n.Kind" />
+        }
+
+        <div class="nook-sb-heading">Collections</div>
+        @foreach (var c in _collections)
+        {
+            <div ondragover="event.preventDefault()" @ondrop="@(() => OnDropOnCollection(c.Node.NodeId))">
+                <MudNavLink Href="@($"/nodes/{c.Node.NodeId}")" Icon="@Icons.Material.Filled.Collections">
+                    @c.Node.Title (@c.MemberCount)
+                </MudNavLink>
+            </div>
+        }
+
+        <div class="nook-sb-heading">Recents</div>
+        @foreach (var r in Workspace.Recents)
+        {
+            <SidebarNodeLink NodeId="r.Id" Title="@r.Title" Kind="r.Kind" />
+        }
+    </MudNavMenu>
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [CascadingParameter] public WorkspaceState Workspace { get; set; } = default!;
+
+    private List<Node> _favorites = new();
+    private List<Node> _pinned = new();
+    private List<CollectionSummary> _collections = new();
+
+    // Drop TARGET scaffold only (Task 16 scope). Full drag-SOURCE wiring — a `draggable`
+    // SidebarNodeLink setting _draggedNodeId via a shared drag context — is deferred to a
+    // follow-up task; until a source sets this, OnDropOnCollection is a harmless no-op.
+    private int? _draggedNodeId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _favorites = await Nodes.GetFavoritesAsync();
+        _pinned = await Nodes.GetPinnedAsync();
+        _collections = await Collections.GetCollectionsAsync();
+        Workspace.Changed += OnChanged;
+    }
+
+    private async Task OnDropOnCollection(int collectionNodeId)
+    {
+        if (_draggedNodeId is int nodeId)
+        {
+            await Collections.AddMemberAsync(collectionNodeId, nodeId);
+            _collections = await Collections.GetCollectionsAsync();
+            _draggedNodeId = null;
+            StateHasChanged();
+        }
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Workspace.Changed -= OnChanged;
+}

@@ -74,4 +74,30 @@ public static class NodeUi
         NodeKind.Person, NodeKind.Project, NodeKind.Place, NodeKind.Organization,
         NodeKind.Topic, NodeKind.Resource,
     };
+
+    /// <summary>Per-kind accent color (hex) from the design spec's 16-kind map.</summary>
+    public static string KindAccent(NodeKind kind) => kind switch
+    {
+        NodeKind.Unclassified => "#8C8578",
+        NodeKind.Note         => "#4C7DF0",
+        NodeKind.Journal      => "#E0863C",
+        NodeKind.Observation  => "#14B8A6",
+        NodeKind.Idea         => "#F5B417",
+        NodeKind.Reference    => "#5878A6",
+        NodeKind.Bookmark     => "#F2416A",
+        NodeKind.List         => "#23A968",
+        NodeKind.Person       => "#F76F5A",
+        NodeKind.Project      => "#7C5CFF",
+        NodeKind.Place        => "#A15C34",
+        NodeKind.Organization => "#A24C8C",
+        NodeKind.Topic        => "#17B0C4",
+        NodeKind.Resource     => "#7E9C24",
+        NodeKind.Collection   => "#B78430",
+        NodeKind.Event        => "#EE5D9A",
+        _ => "#8C8578",
+    };
+
+    /// <summary>The CSS custom-property name backing a kind's accent (e.g. --kind-note).</summary>
+    public static string KindAccentVar(NodeKind kind) =>
+        "--kind-" + kind.ToString().ToLowerInvariant();
 }

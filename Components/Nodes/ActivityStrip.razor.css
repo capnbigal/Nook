@@ -1,0 +1,17 @@
+.activity-strip__row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .2rem 0;
+}
+
+.activity-strip__when {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: .8rem;
+}
+
+.activity-strip__text {
+    flex: 1 1 auto;
+    min-width: 0;
+}

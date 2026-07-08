@@ -1,0 +1,162 @@
+@* Collapsible right rail for a node page. Composes the REUSED node panels
+   (ConnectionsPanel/ActionsPanel/CollectionAssignmentPanel/TagAutocomplete/TagChips)
+   unchanged, and adds Kind/State/pin/favorite/archive controls plus reserved,
+   currently-empty AI slots for a later stream. Every mutation here calls
+   OnChanged so the hosting NodePage can reload the node. *@
+@inject INodeService NodeService
+@inject ITagService TagService
+@inject ISnackbar Snackbar
+
+<aside class="prop-panel @(Collapsed ? "prop-panel--collapsed" : null)">
+    <div class="prop-panel__head">
+        <MudText Typo="Typo.subtitle2">Properties</MudText>
+        <MudIconButton Size="Size.Small"
+            Icon="@(Collapsed ? Icons.Material.Filled.ChevronLeft : Icons.Material.Filled.ChevronRight)"
+            OnClick="ToggleCollapse" title="@(Collapsed ? "Expand properties" : "Collapse properties")" />
+    </div>
+
+    @if (!Collapsed)
+    {
+        <div class="prop-panel__body">
+            <section class="prop-section">
+                <MudText Typo="Typo.overline">Kind</MudText>
+                <div class="prop-kinds">
+                    @foreach (var k in NodeUi.AssignableKinds)
+                    {
+                        <MudChip T="string" Size="Size.Small" Icon="@NodeUi.Icon(k)"
+                                 Variant="@(k == Node.Kind ? Variant.Filled : Variant.Outlined)"
+                                 OnClick="@(() => SetKind(k))">@k</MudChip>
+                    }
+                </div>
+            </section>
+
+            <section class="prop-section">
+                <MudText Typo="Typo.overline">State</MudText>
+                <MudSelect T="NodeState" Value="Node.State" ValueChanged="SetState" Dense="true">
+                    @foreach (var s in Enum.GetValues<NodeState>())
+                    {
+                        <MudSelectItem T="NodeState" Value="s">@s</MudSelectItem>
+                    }
+                </MudSelect>
+                <div class="prop-flags">
+                    <MudIconButton Size="Size.Small"
+                        Icon="@(Node.IsPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                        Color="@(Node.IsPinned ? Color.Primary : Color.Default)" OnClick="TogglePin" title="Pin" />
+                    <MudIconButton Size="Size.Small"
+                        Icon="@(Node.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                        Color="@(Node.IsFavorite ? Color.Warning : Color.Default)" OnClick="ToggleFav" title="Favorite" />
+                    @if (Node.State != NodeState.Archived)
+                    {
+                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Archive" OnClick="Archive" title="Archive" />
+                    }
+                    else
+                    {
+                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Unarchive" OnClick="Restore" title="Restore" />
+                    }
+                </div>
+            </section>
+
+            <section class="prop-section">
+                <MudText Typo="Typo.overline">Tags</MudText>
+                <TagAutocomplete AllTags="_allTags" SelectedTagIds="_selectedTagIds"
+                                 SelectedTagIdsChanged="OnTagsChanged" />
+                <TagChips Tags="Node.Tags" Class="mt-2" />
+            </section>
+
+            <section class="prop-section">
+                <ConnectionsPanel NodeId="Node.NodeId" OnChanged="Notify" />
+            </section>
+
+            <section class="prop-section">
+                <ActionsPanel NodeId="Node.NodeId" OnChanged="Notify" />
+            </section>
+
+            <section class="prop-section">
+                <CollectionAssignmentPanel NodeId="Node.NodeId" OnChanged="Notify" />
+            </section>
+
+            <section class="prop-section prop-ai" data-ai-slot="suggested-links"></section>
+            <section class="prop-section prop-ai" data-ai-slot="summary"></section>
+        </div>
+    }
+</aside>
+
+@code {
+    [Parameter, EditorRequired] public Node Node { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public bool Collapsed { get; set; }
+    [Parameter] public EventCallback<bool> CollapsedChanged { get; set; }
+
+    private List<Tag> _allTags = new();
+    private List<int> _selectedTagIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allTags = await TagService.GetAllAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        _selectedTagIds = Node.Tags.Select(t => t.TagId).ToList();
+    }
+
+    private async Task ToggleCollapse()
+    {
+        Collapsed = !Collapsed;
+        await CollapsedChanged.InvokeAsync(Collapsed);
+    }
+
+    private async Task Notify() => await OnChanged.InvokeAsync();
+
+    private async Task SetKind(NodeKind k)
+    {
+        if (k == Node.Kind) return;
+        await NodeService.PromoteAsync(Node.NodeId, k);
+        await Notify();
+    }
+
+    private async Task SetState(NodeState s)
+    {
+        if (s == Node.State) return;
+        await NodeService.SetStateAsync(Node.NodeId, s);
+        await Notify();
+    }
+
+    private async Task TogglePin()
+    {
+        await NodeService.TogglePinAsync(Node.NodeId);
+        await Notify();
+    }
+
+    private async Task ToggleFav()
+    {
+        await NodeService.ToggleFavoriteAsync(Node.NodeId);
+        await Notify();
+    }
+
+    private async Task Archive()
+    {
+        await NodeService.ArchiveAsync(Node.NodeId);
+        Snackbar.Add("Archived", Severity.Info);
+        await Notify();
+    }
+
+    private async Task Restore()
+    {
+        await NodeService.RestoreAsync(Node.NodeId);
+        await Notify();
+    }
+
+    // TagAutocomplete only mutates the working _selectedTagIds list; this path
+    // persists it via UpdateAsync(node, tagIds), which reconciles tags. Reconciling
+    // immediately on every add/remove is intended here (unlike InlineTitleEditor's
+    // tagIds:null title-only path, which deliberately leaves tags untouched).
+    private async Task OnTagsChanged(List<int> ids)
+    {
+        _selectedTagIds = ids;
+        var node = await NodeService.GetByIdAsync(Node.NodeId);
+        if (node is null) return;
+        await NodeService.UpdateAsync(node, ids);
+        await Notify();
+    }
+}

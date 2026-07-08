@@ -1,0 +1,16 @@
+@using Nook.Models
+@using Nook.Services
+
+<MudNavLink Href="@($"/nodes/{NodeId}")" Class="nook-sidebar-link"
+            Style="@($"border-left:3px solid {NodeUi.KindAccent(Kind)}")">
+    <div class="d-flex align-center gap-2">
+        <ObjectTypeBadge Kind="Kind" ShowLabel="false" />
+        <span class="text-truncate">@Title</span>
+    </div>
+</MudNavLink>
+
+@code {
+    [Parameter] public int NodeId { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public NodeKind Kind { get; set; }
+}

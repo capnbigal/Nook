@@ -8,11 +8,15 @@ public interface INodeService
     // ---- Querying ----
     Task<List<Node>> QueryAsync(NodeFilter filter);
     Task<Node?> GetByIdAsync(int id);
+    /// <summary>Find the current user's node with an exact (case-sensitive) Title match. Most-recently-updated wins if duplicates exist; null if none.</summary>
+    Task<Node?> FindByExactTitleAsync(string title, CancellationToken ct = default);
 
     // ---- Mutations ----
     Task<Node> CreateAsync(Node node, IEnumerable<int>? tagIds = null);
     Task<Node> QuickCaptureAsync(string title, string? body = null);
     Task UpdateAsync(Node node, IEnumerable<int>? tagIds = null);
+    /// <summary>Persist only the Body (and UpdatedAt) of an owned node. Never touches tags/relations/kind/state.</summary>
+    Task SaveBodyAsync(int nodeId, string? body, CancellationToken ct = default);
     Task PromoteAsync(int id, NodeKind kind);
     Task SetStateAsync(int id, NodeState state);
     Task ArchiveAsync(int id);

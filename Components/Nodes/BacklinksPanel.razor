@@ -1,0 +1,47 @@
+@* Read-only panel listing the nodes that point AT this node (backlinks), grouped by
+   relation label. Reuses the Task 11 ObjectTypeBadge in its compact form (ShowLabel="false")
+   — mirrors the pattern already used by Components/Workspace/SidebarNodeLink.razor. *@
+@inject IRelationService RelationService
+
+<section class="backlinks-panel">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Backlinks</MudText>
+    @if (_backlinks.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No backlinks yet.</MudText>
+    }
+    else
+    {
+        @foreach (var group in _backlinks.GroupBy(c => c.Label).OrderBy(g => g.Key))
+        {
+            <div class="backlinks-panel__group">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary">@group.Key</MudText>
+                @foreach (var c in group)
+                {
+                    <div class="backlinks-panel__row">
+                        <ObjectTypeBadge Kind="c.OtherKind" ShowLabel="false" />
+                        <MudLink Href="@($"/nodes/{c.OtherNodeId}")">@c.OtherTitle</MudLink>
+                    </div>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int NodeId { get; set; }
+    [Parameter] public int? RefreshToken { get; set; }
+
+    private IReadOnlyList<Connection> _backlinks = Array.Empty<Connection>();
+    private int _loadedFor = -1;
+    private int? _loadedToken;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor == NodeId && _loadedToken == RefreshToken) return;
+
+        var connections = await RelationService.GetConnectionsAsync(NodeId);
+        _backlinks = connections.Backlinks;
+        _loadedFor = NodeId;
+        _loadedToken = RefreshToken;
+    }
+}
