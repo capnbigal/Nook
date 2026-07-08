@@ -2,6 +2,8 @@
 @inject ThemeState Theme
 @inject IJSRuntime JS
 <div class="@($"nook-topbar-inner {Class}")">
+    <MudIconButton Icon="@Icons.Material.Filled.ViewSidebar" Size="Size.Small" title="Toggle sidebar"
+                   OnClick="Workspace.ToggleSidebarAsync" />
     <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" title="Back"
                    OnClick="@(() => JS.InvokeVoidAsync("history.back"))" />
     <MudIconButton Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" title="Forward"
@@ -19,6 +21,7 @@
 @code {
     [Parameter] public string? Class { get; set; }
     [Parameter] public EventCallback OnOpenPalette { get; set; }
+    [CascadingParameter] public WorkspaceState Workspace { get; set; } = default!;
 
     protected override void OnInitialized() => Theme.Changed += OnChanged;
 

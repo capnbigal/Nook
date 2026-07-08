@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
 @using Nook.Components.Workspace
+@using Microsoft.AspNetCore.Components.Routing
 @inject ThemeState Theme
 @inject WorkspaceState Workspace
 @inject IJSRuntime JS
@@ -12,7 +13,7 @@
 <MudSnackbarProvider />
 
 <CascadingValue Value="Workspace">
-    <div class="nook-shell">
+    <div class="nook-shell @(Workspace.SidebarCollapsed ? "sidebar-collapsed" : null)">
         <GlobalRail Class="nook-rail" />
         <WorkspaceSidebar Class="nook-sidebar" />
         <div class="nook-main">
@@ -45,6 +46,7 @@
         await Workspace.InitializeAsync();
         Theme.Changed += OnStateChanged;
         Workspace.Changed += OnStateChanged;
+        Nav.LocationChanged += OnLocationChanged;
         BuildCommands();
     }
 
@@ -145,12 +147,18 @@
 
     private void OnStateChanged() => InvokeAsync(StateHasChanged);
 
+    // Clear the breadcrumb trail on navigation; the destination page sets its own
+    // (pages that don't wire a trail fall back to "Nook").
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+        => Workspace.SetTrail(Array.Empty<Breadcrumb>());
+
     private void OpenPalette() { _paletteOpen = true; StateHasChanged(); }
 
     public async ValueTask DisposeAsync()
     {
         Theme.Changed -= OnStateChanged;
         Workspace.Changed -= OnStateChanged;
+        Nav.LocationChanged -= OnLocationChanged;
 
         if (_shortcutsModule is not null)
         {

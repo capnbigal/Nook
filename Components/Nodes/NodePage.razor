@@ -41,7 +41,11 @@ else
     {
         _loading = true;
         _node = await NodeService.GetByIdAsync(Id);
-        if (_node is not null) await Workspace.NoteVisitedAsync(Id);
+        if (_node is not null)
+        {
+            await Workspace.NoteVisitedAsync(Id);
+            Workspace.SetTrail(new[] { new Breadcrumb("Home", "/today"), new Breadcrumb(_node.Title, null) });
+        }
         _loading = false;
     }
 

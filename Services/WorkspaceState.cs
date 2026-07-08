@@ -20,6 +20,7 @@ public sealed class WorkspaceState
 
     public IReadOnlyList<RecentNode> Recents { get; private set; } = Array.Empty<RecentNode>();
     public IReadOnlyList<Breadcrumb> Trail { get; private set; } = Array.Empty<Breadcrumb>();
+    public bool SidebarCollapsed { get; private set; }
     public event Action? Changed;
 
     /// <summary>PURE: dedupe, move visited id to front, cap. Unit-tested.</summary>
@@ -35,8 +36,18 @@ public sealed class WorkspaceState
     /// <summary>Loads persisted recents. Safe during prerender (no JS interop involved).</summary>
     public async Task InitializeAsync()
     {
+        var pref = await _prefs.GetOrCreateAsync();
+        SidebarCollapsed = pref.SidebarCollapsed;
         _recentIds = (await _prefs.GetRecentIdsAsync()).ToList();
         await HydrateAsync();
+    }
+
+    /// <summary>Flips the sidebar collapsed state, persists it, and raises Changed.</summary>
+    public async Task ToggleSidebarAsync()
+    {
+        SidebarCollapsed = !SidebarCollapsed;
+        await _prefs.SetSidebarCollapsedAsync(SidebarCollapsed);
+        Changed?.Invoke();
     }
 
     /// <summary>Records a visit: persists to preferences, re-merges the in-memory MRU list, and raises Changed.</summary>

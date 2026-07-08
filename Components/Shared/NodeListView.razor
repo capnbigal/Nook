@@ -45,9 +45,13 @@ else
     [Parameter, EditorRequired] public NodeFilter Filter { get; set; } = new();
     [Parameter] public bool ShowSearch { get; set; } = true;
     [Parameter] public bool ShowDates { get; set; }
+    [CascadingParameter] public WorkspaceState? Workspace { get; set; }
 
     private List<Node>? _nodes;
     private string? _search;
+
+    protected override void OnInitialized()
+        => Workspace?.SetTrail(new[] { new Breadcrumb("Home", "/today"), new Breadcrumb(Title, null) });
 
     protected override async Task OnParametersSetAsync() => await Reload();
 

@@ -10,6 +10,13 @@
     grid-template-columns: 56px 0 1fr;
 }
 
+/* The sidebar is a child component (own root), so reach it with ::deep and clip
+   its content into the 0-width column when collapsed. */
+.nook-shell.sidebar-collapsed ::deep .nook-sidebar {
+    min-width: 0;
+    overflow: hidden;
+}
+
 .nook-rail {
     grid-column: 1;
     border-right: 1px solid var(--line, #E9E4D9);
