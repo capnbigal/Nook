@@ -46,6 +46,7 @@
     private int _active;
     private CancellationTokenSource? _debounce;
     private bool _focusPending;
+    private bool _wasOpen;
 
     private sealed record Row(Command Command);
     private List<Row> _nodeRows = new();
@@ -63,7 +64,18 @@
 
     protected override void OnParametersSet()
     {
-        if (Open) _focusPending = true;
+        if (Open && !_wasOpen)
+        {
+            // Fresh open — reset any leftover state. A shell Action can close the
+            // palette by setting the bound Open=false without going through
+            // CloseAsync, which would otherwise leave a stale query/results here.
+            _query = "";
+            _nodeRows = new();
+            _active = 0;
+            _debounce?.Cancel();
+            _focusPending = true;
+        }
+        _wasOpen = Open;
         Recompute();
     }
 
@@ -117,16 +129,12 @@
         switch (e.Key)
         {
             case "ArrowDown":
-                _active = Math.Min(_active + 1, _visible.Count - 1);
-                break;
             case "j" when e.CtrlKey:
-                _active = Math.Min(_active + 1, _visible.Count - 1);
+                if (_visible.Count > 0) _active = Math.Min(_active + 1, _visible.Count - 1);
                 break;
             case "ArrowUp":
-                _active = Math.Max(_active - 1, 0);
-                break;
             case "k" when e.CtrlKey:
-                _active = Math.Max(_active - 1, 0);
+                if (_visible.Count > 0) _active = Math.Max(_active - 1, 0);
                 break;
             case "Enter" when (e.MetaKey || e.CtrlKey):
                 if (!string.IsNullOrWhiteSpace(_query))

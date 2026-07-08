@@ -148,10 +148,9 @@
     }
 
     // TagAutocomplete only mutates the working _selectedTagIds list; this path
-    // persists it via the same non-destructive-elsewhere, tag-reconciling
-    // UpdateAsync(node, tagIds) used by NodeDetail.SaveEdit — reconciling tags
+    // persists it via UpdateAsync(node, tagIds), which reconciles tags. Reconciling
     // immediately on every add/remove is intended here (unlike InlineTitleEditor's
-    // tagIds:null title-only path).
+    // tagIds:null title-only path, which deliberately leaves tags untouched).
     private async Task OnTagsChanged(List<int> ids)
     {
         _selectedTagIds = ids;
